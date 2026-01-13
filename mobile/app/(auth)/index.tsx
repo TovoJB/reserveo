@@ -1,5 +1,5 @@
 import useSocialAuth from "@/hooks/useSocialAuth";
-import { View, Text, Image, TouchableOpacity, ActivityIndicator } from "react-native";
+import { ActivityIndicator, Image, Text, TouchableOpacity, View } from "react-native";
 
 const AuthScreen = () => {
   const { loadingStrategy, handleSocialAuth } = useSocialAuth();

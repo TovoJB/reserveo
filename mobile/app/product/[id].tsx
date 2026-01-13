@@ -1,3 +1,4 @@
+import FloorPlanModal from "@/components/FloorPlanModal";
 import SafeScreen from "@/components/SafeScreen";
 import useCart from "@/hooks/useCart";
 import { useProduct } from "@/hooks/useProduct";
@@ -7,13 +8,13 @@ import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
-  View,
-  Text,
-  Alert,
   ActivityIndicator,
-  TouchableOpacity,
-  ScrollView,
+  Alert,
   Dimensions,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const { width } = Dimensions.get("window");
@@ -27,19 +28,38 @@ const ProductDetailScreen = () => {
     useWishlist();
 
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [quantity, setQuantity] = useState(1);
+  const [showFloorPlan, setShowFloorPlan] = useState(false);
 
-  const handleAddToCart = () => {
+  const handleReserve = () => {
     if (!product) return;
+    setShowFloorPlan(true);
+  };
+
+  const handleConfirmReservation = (selectedAreas: any[]) => {
+    if (!product) return;
+    
     addToCart(
-      { productId: product._id, quantity },
+      { productId: product._id, quantity: selectedAreas.length },
       {
-        onSuccess: () => Alert.alert("Success", `${product.name} added to cart!`),
+        onSuccess: () => {
+          Alert.alert("Réservation confirmée", `${selectedAreas.length} zone(s) réservée(s) !`);
+          setShowFloorPlan(false);
+        },
         onError: (error: any) => {
-          Alert.alert("Error", error?.response?.data?.error || "Failed to add to cart");
+          Alert.alert("Erreur", error?.response?.data?.error || "Échec de la réservation");
         },
       }
     );
+  };
+
+  const getAvailabilityIcon = (category: string) => {
+    if (category.toLowerCase().includes("coworking")) return "desktop-outline";
+    if (category.toLowerCase().includes("event") || category.toLowerCase().includes("hall"))
+      return "restaurant-outline";
+    if (category.toLowerCase().includes("meeting")) return "business-outline";
+    if (category.toLowerCase().includes("airbnb")) return "home-outline";
+    if (category.toLowerCase().includes("hotel")) return "bed-outline";
+    return "cube-outline";
   };
 
   if (isLoading) return <LoadingUI />;
@@ -137,16 +157,16 @@ const ProductDetailScreen = () => {
               <Text className="text-text-secondary text-sm">({product.totalReviews} reviews)</Text>
             </View>
             {inStock ? (
-              <View className="ml-3 flex-row items-center">
-                <View className="w-2 h-2 bg-green-500 rounded-full mr-2" />
-                <Text className="text-green-500 font-semibold text-sm">
-                  {product.stock} in stock
+              <View className="ml-3 flex-row items-center bg-primary/10 px-3 py-1.5 rounded-full">
+                <Ionicons name={getAvailabilityIcon(product.category)} size={16} color="#1DB954" />
+                <Text className="text-primary font-semibold text-sm ml-2">
+                  {product.stock} disponible{product.stock > 1 ? "s" : ""}
                 </Text>
               </View>
             ) : (
               <View className="ml-3 flex-row items-center">
                 <View className="w-2 h-2 bg-red-500 rounded-full mr-2" />
-                <Text className="text-red-500 font-semibold text-sm">Out of Stock</Text>
+                <Text className="text-red-500 font-semibold text-sm">Complet</Text>
               </View>
             )}
           </View>
@@ -156,39 +176,27 @@ const ProductDetailScreen = () => {
             <Text className="text-primary text-4xl font-bold">${product.price.toFixed(2)}</Text>
           </View>
 
-          {/* Quantity */}
+          {/* Availability Info */}
           <View className="mb-6">
-            <Text className="text-text-primary text-lg font-bold mb-3">Quantity</Text>
+            <Text className="text-text-primary text-lg font-bold mb-3">Disponibilité</Text>
 
-            <View className="flex-row items-center">
-              <TouchableOpacity
-                className="bg-surface rounded-full w-12 h-12 items-center justify-center"
-                onPress={() => setQuantity(Math.max(1, quantity - 1))}
-                activeOpacity={0.7}
-                disabled={!inStock}
-              >
-                <Ionicons name="remove" size={24} color={inStock ? "#FFFFFF" : "#666"} />
-              </TouchableOpacity>
-
-              <Text className="text-text-primary text-xl font-bold mx-6">{quantity}</Text>
-
-              <TouchableOpacity
-                className="bg-primary rounded-full w-12 h-12 items-center justify-center"
-                onPress={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                activeOpacity={0.7}
-                disabled={!inStock || quantity >= product.stock}
-              >
-                <Ionicons
-                  name="add"
-                  size={24}
-                  color={!inStock || quantity >= product.stock ? "#666" : "#121212"}
-                />
-              </TouchableOpacity>
+            <View className="bg-surface rounded-2xl p-4">
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center">
+                  <Ionicons name={getAvailabilityIcon(product.category)} size={24} color="#1DB954" />
+                  <View className="ml-3">
+                    <Text className="text-text-primary font-semibold text-base">
+                      {product.stock} {product.category.toLowerCase().includes("coworking") ? "bureaux" : 
+                       product.category.toLowerCase().includes("event") || product.category.toLowerCase().includes("hall") ? "tables" :
+                       product.category.toLowerCase().includes("meeting") ? "salles" : "unités"} disponibles
+                    </Text>
+                    <Text className="text-text-secondary text-sm mt-1">
+                      Sélectionnez vos places sur le plan
+                    </Text>
+                  </View>
+                </View>
+              </View>
             </View>
-
-            {quantity >= product.stock && inStock && (
-              <Text className="text-orange-500 text-sm mt-2">Maximum stock reached</Text>
-            )}
           </View>
 
           {/* Description */}
@@ -203,9 +211,9 @@ const ProductDetailScreen = () => {
       <View className="absolute bottom-0 left-0 right-0 bg-background/95 backdrop-blur-xl border-t border-surface px-6 py-4 pb-8">
         <View className="flex-row items-center gap-3">
           <View className="flex-1">
-            <Text className="text-text-secondary text-sm mb-1">Total Price</Text>
+            <Text className="text-text-secondary text-sm mb-1">À partir de</Text>
             <Text className="text-primary text-2xl font-bold">
-              ${(product.price * quantity).toFixed(2)}
+              ${product.price.toFixed(2)}
             </Text>
           </View>
           <TouchableOpacity
@@ -213,26 +221,36 @@ const ProductDetailScreen = () => {
               !inStock ? "bg-surface" : "bg-primary"
             }`}
             activeOpacity={0.8}
-            onPress={handleAddToCart}
+            onPress={handleReserve}
             disabled={!inStock || isAddingToCart}
           >
             {isAddingToCart ? (
               <ActivityIndicator size="small" color="#121212" />
             ) : (
               <>
-                <Ionicons name="cart" size={24} color={!inStock ? "#666" : "#121212"} />
+                <Ionicons name="calendar" size={24} color={!inStock ? "#666" : "#121212"} />
                 <Text
                   className={`font-bold text-lg ml-2 ${
                     !inStock ? "text-text-secondary" : "text-background"
                   }`}
                 >
-                  {!inStock ? "Out of Stock" : "Add to Cart"}
+                  {!inStock ? "Complet" : "Réserver"}
                 </Text>
               </>
             )}
           </TouchableOpacity>
         </View>
       </View>
+
+      {product && (
+        <FloorPlanModal
+          visible={showFloorPlan}
+          onClose={() => setShowFloorPlan(false)}
+          product={product}
+          onReserve={handleConfirmReservation}
+          isProcessing={isAddingToCart}
+        />
+      )}
     </SafeScreen>
   );
 };

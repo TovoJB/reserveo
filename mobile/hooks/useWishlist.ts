@@ -1,9 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useApi } from "@/lib/api";
+import { mockProducts } from "@/lib/mockData";
 import { Product } from "@/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 const useWishlist = () => {
-  const api = useApi();
   const queryClient = useQueryClient();
 
   const {
@@ -13,23 +12,42 @@ const useWishlist = () => {
   } = useQuery({
     queryKey: ["wishlist"],
     queryFn: async () => {
-      const { data } = await api.get<{ wishlist: Product[] }>("/users/wishlist");
-      return data.wishlist;
+      // Simuler un délai réseau
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      // Retourner une wishlist vide initialement
+      return [] as Product[];
     },
   });
 
   const addToWishlistMutation = useMutation({
     mutationFn: async (productId: string) => {
-      const { data } = await api.post<{ wishlist: string[] }>("/users/wishlist", { productId });
-      return data.wishlist;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const currentWishlist = queryClient.getQueryData<Product[]>(["wishlist"]) || [];
+      const product = mockProducts.find((p) => p._id === productId);
+      
+      if (!product) {
+        throw new Error("Product not found");
+      }
+
+      if (currentWishlist.some((p) => p._id === productId)) {
+        return currentWishlist;
+      }
+
+      const updatedWishlist = [...currentWishlist, product];
+      queryClient.setQueryData(["wishlist"], updatedWishlist);
+      return updatedWishlist;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["wishlist"] }),
   });
 
   const removeFromWishlistMutation = useMutation({
     mutationFn: async (productId: string) => {
-      const { data } = await api.delete<{ wishlist: string[] }>(`/users/wishlist/${productId}`);
-      return data.wishlist;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const currentWishlist = queryClient.getQueryData<Product[]>(["wishlist"]) || [];
+      
+      const updatedWishlist = currentWishlist.filter((p) => p._id !== productId);
+      queryClient.setQueryData(["wishlist"], updatedWishlist);
+      return updatedWishlist;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["wishlist"] }),
   });

@@ -1,9 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useApi } from "@/lib/api";
+import { mockAddresses } from "@/lib/mockData";
 import { Address } from "@/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const useAddresses = () => {
-  const api = useApi();
   const queryClient = useQueryClient();
 
   const {
@@ -13,15 +12,25 @@ export const useAddresses = () => {
   } = useQuery({
     queryKey: ["addresses"],
     queryFn: async () => {
-      const { data } = await api.get<{ addresses: Address[] }>("/users/addresses");
-      return data.addresses;
+      // Simuler un délai réseau
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return mockAddresses;
     },
   });
 
   const addAddressMutation = useMutation({
     mutationFn: async (addressData: Omit<Address, "_id">) => {
-      const { data } = await api.post<{ addresses: Address[] }>("/users/addresses", addressData);
-      return data.addresses;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const currentAddresses = queryClient.getQueryData<Address[]>(["addresses"]) || mockAddresses;
+      
+      const newAddress: Address = {
+        ...addressData,
+        _id: `addr-${Date.now()}`,
+      };
+
+      const updatedAddresses = [...currentAddresses, newAddress];
+      queryClient.setQueryData(["addresses"], updatedAddresses);
+      return updatedAddresses;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["addresses"] });
@@ -36,11 +45,15 @@ export const useAddresses = () => {
       addressId: string;
       addressData: Partial<Address>;
     }) => {
-      const { data } = await api.put<{ addresses: Address[] }>(
-        `/users/addresses/${addressId}`,
-        addressData
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const currentAddresses = queryClient.getQueryData<Address[]>(["addresses"]) || mockAddresses;
+      
+      const updatedAddresses = currentAddresses.map((addr) =>
+        addr._id === addressId ? { ...addr, ...addressData } : addr
       );
-      return data.addresses;
+
+      queryClient.setQueryData(["addresses"], updatedAddresses);
+      return updatedAddresses;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["addresses"] });
@@ -49,8 +62,12 @@ export const useAddresses = () => {
 
   const deleteAddressMutation = useMutation({
     mutationFn: async (addressId: string) => {
-      const { data } = await api.delete<{ addresses: Address[] }>(`/users/addresses/${addressId}`);
-      return data.addresses;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const currentAddresses = queryClient.getQueryData<Address[]>(["addresses"]) || mockAddresses;
+      
+      const updatedAddresses = currentAddresses.filter((addr) => addr._id !== addressId);
+      queryClient.setQueryData(["addresses"], updatedAddresses);
+      return updatedAddresses;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["addresses"] });

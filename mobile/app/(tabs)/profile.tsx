@@ -1,10 +1,10 @@
 import SafeScreen from "@/components/SafeScreen";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { router } from "expo-router";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 const MENU_ITEMS = [
   { id: 1, icon: "person-outline", title: "Edit Profile", color: "#3B82F6", action: "/profile" },
@@ -77,20 +77,7 @@ const ProfileScreen = () => {
           ))}
         </View>
 
-        {/* NOTIFICATONS BTN */}
-        <View className="mb-3 mx-6 bg-surface rounded-2xl p-4">
-          <TouchableOpacity
-            className="flex-row items-center justify-between py-2"
-            activeOpacity={0.7}
-          >
-            <View className="flex-row items-center">
-              <Ionicons name="notifications-outline" size={22} color="#FFFFFF" />
-              <Text className="text-text-primary font-semibold ml-3">Notifications</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#666" />
-          </TouchableOpacity>
-        </View>
-
+      
         {/* PRIVACY AND SECURTIY LINK */}
         <View className="mb-3 mx-6 bg-surface rounded-2xl p-4">
           <TouchableOpacity
@@ -105,6 +92,38 @@ const ProfileScreen = () => {
             <Ionicons name="chevron-forward" size={20} color="#666" />
           </TouchableOpacity>
         </View>
+
+          {/* PRIVACY AND SECURTIY LINK */}
+          <View className="mb-3 mx-6 bg-surface rounded-2xl p-4">
+          <TouchableOpacity
+            className="flex-row items-center justify-between py-2"
+            activeOpacity={0.7}
+            onPress={() => router.push("/privacy-security")}
+          >
+            <View className="flex-row items-center">
+              <Ionicons name="card-outline" size={22} color="#FFFFFF" />
+              <Text className="text-text-primary font-semibold ml-3">add a payment method</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#666" />
+          </TouchableOpacity>
+        </View>
+
+        <View className="mb-3 mx-6 bg-surface rounded-2xl p-4">
+          <TouchableOpacity
+            className="flex-row items-center justify-between py-2"
+            activeOpacity={0.7}
+            onPress={() => router.push("/privacy-security")}
+          >
+            <View className="flex-row items-center">
+              <Ionicons name="receipt-outline" size={22} color="#FFFFFF" />
+              <Text className="text-text-primary font-semibold ml-3">booking history</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#666" />
+          </TouchableOpacity>
+        </View>
+
+
+
 
         {/* SIGNOUT BTN */}
         <TouchableOpacity

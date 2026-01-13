@@ -1,9 +1,9 @@
-import { Redirect, Tabs } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@clerk/clerk-expo";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
+import { Redirect, Tabs } from "expo-router";
 import { StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const TabsLayout = () => {
   const { isSignedIn, isLoaded } = useAuth();
@@ -47,15 +47,15 @@ const TabsLayout = () => {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Shop",
+          title: "Areas",
           tabBarIcon: ({ color, size }) => <Ionicons name="grid" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="cart"
+        name="booking"
         options={{
-          title: "Cart",
-          tabBarIcon: ({ color, size }) => <Ionicons name="cart" size={size} color={color} />,
+          title: "bookings",
+          tabBarIcon: ({ color, size }) => <Ionicons name="bookmarks" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -65,6 +65,7 @@ const TabsLayout = () => {
           tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
         }}
       />
+      
     </Tabs>
   );
 };

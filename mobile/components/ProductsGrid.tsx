@@ -1,16 +1,18 @@
+import FloorPlanModal from "@/components/FloorPlanModal";
 import useCart from "@/hooks/useCart";
 import useWishlist from "@/hooks/useWishlist";
 import { Product } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useState } from "react";
 import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  Image,
   ActivityIndicator,
   Alert,
+  FlatList,
+  Image,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 interface ProductsGridProps {
@@ -24,19 +26,40 @@ const ProductsGrid = ({ products, isLoading, isError }: ProductsGridProps) => {
     useWishlist();
 
   const { isAddingToCart, addToCart } = useCart();
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [showFloorPlan, setShowFloorPlan] = useState(false);
 
-  const handleAddToCart = (productId: string, productName: string) => {
+  const handleReserve = (product: Product) => {
+    setSelectedProduct(product);
+    setShowFloorPlan(true);
+  };
+
+  const handleConfirmReservation = (selectedAreas: any[]) => {
+    if (!selectedProduct) return;
+    
     addToCart(
-      { productId, quantity: 1 },
+      { productId: selectedProduct._id, quantity: selectedAreas.length },
       {
         onSuccess: () => {
-          Alert.alert("Success", `${productName} added to cart!`);
+          Alert.alert("Réservation confirmée", `${selectedAreas.length} zone(s) réservée(s) !`);
+          setShowFloorPlan(false);
+          setSelectedProduct(null);
         },
         onError: (error: any) => {
-          Alert.alert("Error", error?.response?.data?.error || "Failed to add to cart");
+          Alert.alert("Erreur", error?.response?.data?.error || "Échec de la réservation");
         },
       }
     );
+  };
+
+  const getAvailabilityIcon = (category: string) => {
+    if (category.toLowerCase().includes("coworking")) return "desktop-outline";
+    if (category.toLowerCase().includes("event") || category.toLowerCase().includes("hall"))
+      return "restaurant-outline";
+    if (category.toLowerCase().includes("meeting")) return "business-outline";
+    if (category.toLowerCase().includes("airbnb")) return "home-outline";
+    if (category.toLowerCase().includes("hotel")) return "bed-outline";
+    return "cube-outline";
   };
 
   const renderProduct = ({ item: product }: { item: Product }) => (
@@ -85,20 +108,32 @@ const ProductsGrid = ({ products, isLoading, isError }: ProductsGridProps) => {
           <Text className="text-text-secondary text-xs ml-1">({product.totalReviews})</Text>
         </View>
 
+        {/* Availability */}
+        <View className="flex-row items-center mb-3">
+          <View className="flex-row items-center bg-primary/10 px-2 py-1 rounded-full">
+            <Ionicons name={getAvailabilityIcon(product.category)} size={14} color="#1DB954" />
+            <Text className="text-primary font-semibold text-xs ml-1.5">
+              {product.stock} disponible{product.stock > 1 ? "s" : ""}
+            </Text>
+          </View>
+        </View>
+
         <View className="flex-row items-center justify-between">
           <Text className="text-primary font-bold text-lg">${product.price.toFixed(2)}</Text>
 
           <TouchableOpacity
-            className="bg-primary rounded-full w-8 h-8 items-center justify-center"
+            className="bg-primary rounded-full px-4 py-2 flex-row items-center"
             activeOpacity={0.7}
-            onPress={() => handleAddToCart(product._id, product.name)}
-            disabled={isAddingToCart}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleReserve(product);
+            }}
+            disabled={product.stock === 0}
           >
-            {isAddingToCart ? (
-              <ActivityIndicator size="small" color="#121212" />
-            ) : (
-              <Ionicons name="add" size={18} color="#121212" />
-            )}
+            <Ionicons name="calendar-outline" size={16} color="#121212" />
+            <Text className="text-background font-bold text-sm ml-1.5">
+              Réserver
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -125,16 +160,30 @@ const ProductsGrid = ({ products, isLoading, isError }: ProductsGridProps) => {
   }
 
   return (
-    <FlatList
-      data={products}
-      renderItem={renderProduct}
-      keyExtractor={(item) => item._id}
-      numColumns={2}
-      columnWrapperStyle={{ justifyContent: "space-between" }}
-      showsVerticalScrollIndicator={false}
-      scrollEnabled={false}
-      ListEmptyComponent={NoProductsFound}
-    />
+    <>
+      <FlatList
+        data={products}
+        renderItem={renderProduct}
+        keyExtractor={(item) => item._id}
+        numColumns={2}
+        columnWrapperStyle={{ justifyContent: "space-between" }}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={false}
+        ListEmptyComponent={NoProductsFound}
+      />
+      {selectedProduct && (
+        <FloorPlanModal
+          visible={showFloorPlan}
+          onClose={() => {
+            setShowFloorPlan(false);
+            setSelectedProduct(null);
+          }}
+          product={selectedProduct}
+          onReserve={handleConfirmReservation}
+          isProcessing={isAddingToCart}
+        />
+      )}
+    </>
   );
 };
 

@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useApi } from "@/lib/api";
 
 interface CreateReviewData {
   productId: string;
@@ -8,13 +7,21 @@ interface CreateReviewData {
 }
 
 export const useReviews = () => {
-  const api = useApi();
   const queryClient = useQueryClient();
 
   const createReview = useMutation({
     mutationFn: async (data: CreateReviewData) => {
-      const response = await api.post("/reviews", data);
-      return response.data;
+      // Simuler un délai réseau
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Retourner une réponse fictive
+      return {
+        success: true,
+        review: {
+          _id: `review-${Date.now()}`,
+          ...data,
+          createdAt: new Date().toISOString(),
+        },
+      };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
