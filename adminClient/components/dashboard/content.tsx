@@ -3,7 +3,7 @@
 import { WelcomeSection } from "./header";
 import { StatsCards } from "./stats-cards";
 import { LeadsChart } from "./leads-chart";
-import { TopPerformers } from "./top-performers";
+//import { TopPerformers } from "./top-performers";
 import { LeadsTable } from "./leads-table";
 import { RevenueFlowChart } from "./revenue-flow-chart";
 import { LeadSourcesChart } from "./lead-sources-chart";

@@ -61,10 +61,10 @@ const navItems = [
   // { title: "Search", icon: Search, shortcut: "/" },
   { title: "Clients", icon: UserPlus },
   { title: "Dashboard", icon: BarChart3, isActive: true },
-  { title: "My Tasks", icon: CheckSquare },
+  { title: "Tasks", icon: CheckSquare },
   { title: "open plan", icon: Layers },
   { title: "Calendar", icon: Calendar },
-  { title: "Documents", icon: FileText },
+  { title: "Bookings", icon: FileText },
   { title: "Teams", icon: Users },
   { title: "Company", icon: Building },
 ];
@@ -226,14 +226,18 @@ export function DashboardSidebar({
                     isActive={
                       (item.title === "Dashboard" && !currentViewId && !searchParams?.get("view")) ||
                       (item.title === "Calendar" && searchParams?.get("view") === "calendar") ||
-                      (item.title === "open plan" && searchParams?.get("view") === "bookmarks")
+                      (item.title === "open plan" && searchParams?.get("view") === "bookmarks") ||
+                      (item.title === "Clients" && searchParams?.get("view") === "clients") ||
+                      (item.title === "Tasks" && searchParams?.get("view") === "tasks")
                     }
                     className="h-7"
                   >
                     <Link href={
                       item.title === "Dashboard" ? "/" :
                         item.title === "Calendar" ? "/?view=calendar" :
-                          item.title === "open plan" ? "/?view=bookmarks" : "#"
+                          item.title === "open plan" ? "/?view=bookmarks" :
+                            item.title === "Clients" ? "/?view=clients" :
+                              item.title === "Tasks" ? "/?view=tasks" : "#"
                     }>
                       <item.icon className="size-3.5" />
                       <span className="text-sm">{item.title}</span>

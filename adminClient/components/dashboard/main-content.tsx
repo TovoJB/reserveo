@@ -8,6 +8,8 @@ import { CalendarView } from "../calendar/calendar-view";
 import { CalendarControls } from "../calendar/calendar-controls";
 import { BookmarksContent } from "../bookmarks/content";
 import { BookmarksHeader } from "../bookmarks/header";
+import { ClientsTable } from "./clients-table";
+import { TasksTable } from "./tasks-table";
 
 export function MainContent() {
     const searchParams = useSearchParams();
@@ -33,6 +35,22 @@ export function MainContent() {
             <div className="flex flex-col h-full overflow-hidden">
                 <BookmarksHeader />
                 <BookmarksContent />
+            </div>
+        );
+    }
+
+    if (view === "clients") {
+        return (
+            <div className="flex flex-col h-full overflow-hidden">
+                <ClientsTable />
+            </div>
+        );
+    }
+
+    if (view === "tasks") {
+        return (
+            <div className="flex flex-col h-full overflow-hidden">
+                <TasksTable />
             </div>
         );
     }
