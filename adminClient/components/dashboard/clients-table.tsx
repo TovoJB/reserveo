@@ -57,7 +57,6 @@ import {
 } from "@/components/ui/select";
 import { leads, LeadType, LeadStatus, LeadSource } from "@/mock-data/dashboard";
 import { useDashboardStore } from "@/store/dashboard-store";
-import { client } from "@/mock-data/dashboard-tasks";
 
 type SortField = "name" | "email" | "followUp" | "status" | "score";
 type SortOrder = "asc" | "desc";
@@ -105,7 +104,7 @@ function TypeBadge({ type }: { type: LeadType }) {
   );
 }
 
-function StatusBadge({ status }: { status: client }) {
+function StatusBadge({ status }: { status: LeadStatus }) {
   if (status === "closed") {
     return (
       <div

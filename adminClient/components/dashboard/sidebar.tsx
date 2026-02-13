@@ -85,13 +85,13 @@ const workgroups = [
         ],
       },
       {
-        id: "evenement 2", name: "anniversaire", icon: Folder,
+        id: "evenement 2", name: "parking", icon: Folder,
         children: [
           { id: "etage 1", name: "etage 1", icon: File },
           { id: "etage 2", name: "etage 2", icon: File },
         ],
       },
-      { id: "evenement 3", name: "anniversaire", icon: Folder },
+      { id: "evenement 3", name: "transport", icon: Folder },
     ],
   },
   { id: "marketing", name: "Marketing", icon: Megaphone },
@@ -228,7 +228,9 @@ export function DashboardSidebar({
                       (item.title === "Calendar" && searchParams?.get("view") === "calendar") ||
                       (item.title === "open plan" && searchParams?.get("view") === "bookmarks") ||
                       (item.title === "Clients" && searchParams?.get("view") === "clients") ||
-                      (item.title === "Tasks" && searchParams?.get("view") === "tasks")
+                      (item.title === "Clients" && searchParams?.get("view") === "clients") ||
+                      (item.title === "Tasks" && searchParams?.get("view") === "tasks") ||
+                      (item.title === "Bookings" && searchParams?.get("view") === "bookings")
                     }
                     className="h-7"
                   >
@@ -237,7 +239,8 @@ export function DashboardSidebar({
                         item.title === "Calendar" ? "/?view=calendar" :
                           item.title === "open plan" ? "/?view=bookmarks" :
                             item.title === "Clients" ? "/?view=clients" :
-                              item.title === "Tasks" ? "/?view=tasks" : "#"
+                              item.title === "Tasks" ? "/?view=tasks" :
+                                item.title === "Bookings" ? "/?view=bookings" : "#"
                     }>
                       <item.icon className="size-3.5" />
                       <span className="text-sm">{item.title}</span>

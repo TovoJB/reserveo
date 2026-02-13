@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import "@excalidraw/excalidraw/index.css";
 
@@ -18,6 +18,9 @@ const Excalidraw = dynamic(
 
 interface ExcalidrawWrapperProps {
     floorId: string;
+    viewMode?: boolean;
+    onElementsChange?: (elements: any[]) => void;
+    focusedElementId?: string | null;
 }
 
 function debounce<T extends (...args: any[]) => void>(fn: T, delay: number) {
@@ -49,7 +52,7 @@ const DAYS = [
     { id: 0, label: "Dim" },
 ];
 
-export function ExcalidrawWrapper({ floorId }: ExcalidrawWrapperProps) {
+export function ExcalidrawWrapper({ floorId, viewMode = false, onElementsChange, focusedElementId }: ExcalidrawWrapperProps) {
 
     const [initialData, setInitialData] = useState<any>(null);
     const [isLoaded, setIsLoaded] = useState(false);
@@ -63,7 +66,15 @@ export function ExcalidrawWrapper({ floorId }: ExcalidrawWrapperProps) {
     useEffect(() => {
         setIsLoaded(false);
         const stored = localStorage.getItem(`reserveo-floor-${floorId}`);
-        setInitialData(stored ? JSON.parse(stored) : null);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            setInitialData(parsed);
+            if (onElementsChange) {
+                onElementsChange(parsed.elements || []);
+            }
+        } else {
+            setInitialData(null);
+        }
         setIsLoaded(true);
     }, [floorId]);
 
@@ -76,9 +87,37 @@ export function ExcalidrawWrapper({ floorId }: ExcalidrawWrapperProps) {
             appState: { ...appState, collaborators: [] },
             files,
         }));
-    }, [floorId]);
+
+        if (onElementsChange) {
+            onElementsChange([...elements]);
+        }
+    }, [floorId, onElementsChange]);
 
     const debouncedSave = useCallback(debounce(saveData, 1000), [saveData]);
+
+    // Handle external focus
+    const lastFocusedIdRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (!excalidrawAPI || !focusedElementId || focusedElementId === lastFocusedIdRef.current) return;
+
+        lastFocusedIdRef.current = focusedElementId;
+        focusOnElement(focusedElementId);
+
+        // Reset focus after animation/delay if needed, or keep it. 
+        // For now, let's keep the highlight until focusedElementId changes or is cleared?
+        // Actually, the original focusOnElement sets opacity on others to 15. 
+        // We might want to clear that when focusedElementId becomes null.
+    }, [focusedElementId, excalidrawAPI]);
+
+    useEffect(() => {
+        if (!excalidrawAPI) return;
+        if (focusedElementId === null && lastFocusedIdRef.current !== null) {
+            resetFocus();
+            lastFocusedIdRef.current = null;
+        }
+    }, [focusedElementId, excalidrawAPI]);
+
 
     const handleRemoveBackground = async () => {
         const elements = excalidrawAPI.getSceneElements();
@@ -195,7 +234,7 @@ export function ExcalidrawWrapper({ floorId }: ExcalidrawWrapperProps) {
 
     const childrenList = useMemo(() => {
         const childIds = selectedElement?.customData?.children || [];
-        return allNamedElements.filter((el) => childIds.includes(el.id));
+        return allNamedElements.filter((el: any) => childIds.includes(el.id));
     }, [selectedElement, allNamedElements]);
 
     // Check if 'targetId' is a descendant of 'currentId' to prevent cycles
@@ -203,7 +242,7 @@ export function ExcalidrawWrapper({ floorId }: ExcalidrawWrapperProps) {
         if (visited.has(currentId)) return false;
         visited.add(currentId);
 
-        const currentElement = allNamedElements.find(el => el.id === currentId);
+        const currentElement = allNamedElements.find((el: any) => el.id === currentId);
         if (!currentElement) return false;
 
         const children = currentElement.customData?.children || [];
@@ -223,7 +262,9 @@ export function ExcalidrawWrapper({ floorId }: ExcalidrawWrapperProps) {
                 key={floorId}
                 excalidrawAPI={(api) => setExcalidrawAPI(api)}
                 initialData={initialData || undefined}
+                viewModeEnabled={viewMode}
                 onChange={(elements, appState, files) => {
+                    if (viewMode) return;
                     debouncedSave(elements, appState, files);
                     const selectedIds = appState.selectedElementIds;
                     const id = Object.keys(selectedIds || {})[0];
@@ -324,7 +365,7 @@ export function ExcalidrawWrapper({ floorId }: ExcalidrawWrapperProps) {
                                 <label className="text-[10px] font-bold text-green-600 uppercase block mb-2">Enfants liés</label>
 
                                 <div className="space-y-1 mb-3">
-                                    {childrenList.map((child) => (
+                                    {childrenList.map((child: any) => (
                                         <div
                                             key={child.id}
                                             className="flex items-center justify-between bg-green-50 p-1.5 rounded border border-green-100 text-xs transition-all hover:shadow-sm"
@@ -348,12 +389,12 @@ export function ExcalidrawWrapper({ floorId }: ExcalidrawWrapperProps) {
                                 <label className="text-[10px] font-bold text-gray-400 uppercase block mb-2">Lier un nouvel élément</label>
                                 <div className="max-h-32 overflow-y-auto border rounded bg-gray-50 text-xs divide-y border-gray-200">
                                     {allNamedElements
-                                        .filter(el =>
+                                        .filter((el: any) =>
                                             el.id !== selectedElement.id &&
                                             !(selectedElement.customData?.children || []).includes(el.id) &&
                                             !isDescendant(el.id, selectedElement.id) // Prevent cycles: check if selectedElement is already a descendant of candidate el
                                         )
-                                        .map(el => (
+                                        .map((el: any) => (
                                             <div
                                                 key={el.id}
                                                 className="p-2 hover:bg-blue-50 cursor-pointer flex justify-between items-center group transition-all"
