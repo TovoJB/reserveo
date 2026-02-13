@@ -326,7 +326,7 @@ export function ClientsTable() {
   };
 
   return (
-    <div className="bg-card text-card-foreground rounded-xl border overflow-hidden">
+    <div className="w-full h-full flex flex-col bg-card text-card-foreground rounded-xl border overflow-hidden">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3.5 border-b">
         <div className="flex items-center gap-3">
           <h3 className="font-medium text-base">Lead Management</h3>
@@ -711,11 +711,11 @@ export function ClientsTable() {
         </DropdownMenu>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="flex-1 overflow-auto">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent bg-muted/30">
-              <TableHead className="w-[160px]">
+              <TableHead>
                 <div className="flex items-center gap-2">
                   <Checkbox
                     checked={
@@ -740,7 +740,7 @@ export function ClientsTable() {
                   <span>Type</span>
                 </div>
               </TableHead>
-              <TableHead className="w-[180px]">
+              <TableHead>
                 <button
                   className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
                   onClick={() => toggleSort("email")}
@@ -786,7 +786,7 @@ export function ClientsTable() {
                   <span>Source</span>
                 </div>
               </TableHead>
-              <TableHead className="w-[120px]">
+              <TableHead>
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                   <Globe className="size-3.5" />
                   <span>Website</span>
@@ -816,7 +816,7 @@ export function ClientsTable() {
                 <TableCell>
                   <TypeBadge type={lead.type} />
                 </TableCell>
-                <TableCell className="max-w-[180px]">
+                <TableCell>
                   <span className="text-sm truncate block">{lead.email}</span>
                 </TableCell>
                 <TableCell>
@@ -833,7 +833,7 @@ export function ClientsTable() {
                 <TableCell>
                   <SourceBadge source={lead.source} />
                 </TableCell>
-                <TableCell className="max-w-[120px]">
+                <TableCell>
                   <span className="text-sm text-muted-foreground truncate block">
                     {lead.website || "-"}
                   </span>
