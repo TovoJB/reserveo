@@ -10,6 +10,7 @@ import { BookmarksContent } from "../bookmarks/content";
 import { BookmarksHeader } from "../bookmarks/header";
 import { ClientsTable } from "./clients-table";
 import { TasksTable } from "./tasks-table";
+import { BookingView } from "../excalidrawView/booking-view";
 
 export function MainContent() {
     const searchParams = useSearchParams();
@@ -53,6 +54,10 @@ export function MainContent() {
                 <TasksTable />
             </div>
         );
+    }
+
+    if (view === "bookings") {
+        return <BookingView />;
     }
 
     return <StatsContent />;

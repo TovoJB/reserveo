@@ -37,7 +37,7 @@ const ProductDetailScreen = () => {
 
   const handleConfirmReservation = (selectedAreas: any[]) => {
     if (!product) return;
-    
+
     addToCart(
       { productId: product._id, quantity: selectedAreas.length },
       {
@@ -80,9 +80,8 @@ const ProductDetailScreen = () => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          className={`w-12 h-12 rounded-full items-center justify-center ${
-            isInWishlist(product._id) ? "bg-primary" : "bg-black/50 backdrop-blur-xl"
-          }`}
+          className={`w-12 h-12 rounded-full items-center justify-center ${isInWishlist(product._id) ? "bg-primary" : "bg-black/50 backdrop-blur-xl"
+            }`}
           onPress={() => toggleWishlist(product._id)}
           disabled={isAddingToWishlist || isRemovingFromWishlist}
           activeOpacity={0.7}
@@ -104,7 +103,7 @@ const ProductDetailScreen = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        {/* IMAGE GALLERY */}
+        *
         <View className="relative">
           <ScrollView
             horizontal
@@ -122,32 +121,30 @@ const ProductDetailScreen = () => {
             ))}
           </ScrollView>
 
-          {/* Image Indicators */}
+
           <View className="absolute bottom-4 left-0 right-0 flex-row justify-center gap-2">
             {product.images.map((_: any, index: number) => (
               <View
                 key={index}
-                className={`h-2 rounded-full ${
-                  index === selectedImageIndex ? "bg-primary w-6" : "bg-white/50 w-2"
-                }`}
+                className={`h-2 rounded-full ${index === selectedImageIndex ? "bg-primary w-6" : "bg-white/50 w-2"
+                  }`}
               />
             ))}
           </View>
         </View>
 
-        {/* PRODUCT INFO */}
+
         <View className="p-6">
-          {/* Category */}
+
           <View className="flex-row items-center mb-3">
             <View className="bg-primary/20 px-3 py-1 rounded-full">
               <Text className="text-primary text-xs font-bold">{product.category}</Text>
             </View>
           </View>
 
-          {/* Product Name */}
+
           <Text className="text-text-primary text-3xl font-bold mb-3">{product.name}</Text>
 
-          {/* Rating & Reviews */}
           <View className="flex-row items-center mb-4">
             <View className="flex-row items-center bg-surface px-3 py-2 rounded-full">
               <Ionicons name="star" size={16} color="#FFC107" />
@@ -171,12 +168,12 @@ const ProductDetailScreen = () => {
             )}
           </View>
 
-          {/* Price */}
+
           <View className="flex-row items-center mb-6">
             <Text className="text-primary text-4xl font-bold">${product.price.toFixed(2)}</Text>
           </View>
 
-          {/* Availability Info */}
+
           <View className="mb-6">
             <Text className="text-text-primary text-lg font-bold mb-3">Disponibilité</Text>
 
@@ -186,9 +183,9 @@ const ProductDetailScreen = () => {
                   <Ionicons name={getAvailabilityIcon(product.category)} size={24} color="#1DB954" />
                   <View className="ml-3">
                     <Text className="text-text-primary font-semibold text-base">
-                      {product.stock} {product.category.toLowerCase().includes("coworking") ? "bureaux" : 
-                       product.category.toLowerCase().includes("event") || product.category.toLowerCase().includes("hall") ? "tables" :
-                       product.category.toLowerCase().includes("meeting") ? "salles" : "unités"} disponibles
+                      {product.stock} {product.category.toLowerCase().includes("coworking") ? "bureaux" :
+                        product.category.toLowerCase().includes("event") || product.category.toLowerCase().includes("hall") ? "tables" :
+                          product.category.toLowerCase().includes("meeting") ? "salles" : "unités"} disponibles
                     </Text>
                     <Text className="text-text-secondary text-sm mt-1">
                       Sélectionnez vos places sur le plan
@@ -199,7 +196,7 @@ const ProductDetailScreen = () => {
             </View>
           </View>
 
-          {/* Description */}
+
           <View className="mb-8">
             <Text className="text-text-primary text-lg font-bold mb-3">Description</Text>
             <Text className="text-text-secondary text-base leading-6">{product.description}</Text>
@@ -217,9 +214,8 @@ const ProductDetailScreen = () => {
             </Text>
           </View>
           <TouchableOpacity
-            className={`rounded-2xl px-8 py-4 flex-row items-center ${
-              !inStock ? "bg-surface" : "bg-primary"
-            }`}
+            className={`rounded-2xl px-8 py-4 flex-row items-center ${!inStock ? "bg-surface" : "bg-primary"
+              }`}
             activeOpacity={0.8}
             onPress={handleReserve}
             disabled={!inStock || isAddingToCart}
@@ -230,9 +226,8 @@ const ProductDetailScreen = () => {
               <>
                 <Ionicons name="calendar" size={24} color={!inStock ? "#666" : "#121212"} />
                 <Text
-                  className={`font-bold text-lg ml-2 ${
-                    !inStock ? "text-text-secondary" : "text-background"
-                  }`}
+                  className={`font-bold text-lg ml-2 ${!inStock ? "text-text-secondary" : "text-background"
+                    }`}
                 >
                   {!inStock ? "Complet" : "Réserver"}
                 </Text>

@@ -1,19 +1,17 @@
 import { Product } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Dimensions,
-    Modal,
-    PanResponder,
-    ScrollView,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Modal,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { ExcalidrawViewer } from "./ExcalidrawViewer";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -48,11 +46,6 @@ const FloorPlanModal = ({
 }: FloorPlanModalProps) => {
   const [selectedAreas, setSelectedAreas] = useState<SelectableArea[]>([]);
   const [focusedArea, setFocusedArea] = useState<string | null>(null);
-  
-  // Animation pour le zoom et pan
-  const scale = useRef(new Animated.Value(1)).current;
-  const translateX = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
 
   // Générer des zones fictives
   const generateAreas = (): SelectableArea[] => {
@@ -144,65 +137,9 @@ const FloorPlanModal = ({
   // Focuser sur une zone
   const focusOnArea = (area: SelectableArea) => {
     setFocusedArea(area.id);
-
-    // Centrer sur la zone
-    const centerX = -(area.x / 100) * PLAN_WIDTH + PLAN_WIDTH / 2;
-    const centerY = -(area.y / 100) * SCREEN_HEIGHT + SCREEN_HEIGHT / 2;
-
-    Animated.parallel([
-      Animated.spring(translateX, {
-        toValue: centerX,
-        useNativeDriver: true,
-      }),
-      Animated.spring(translateY, {
-        toValue: centerY,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scale, {
-        toValue: 1.5,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // Retirer le focus après 2s
+    // Future: Scroll to area in Excalidraw
     setTimeout(() => setFocusedArea(null), 2000);
   };
-
-  // Zoom in/out
-  const handleZoomIn = () => {
-    Animated.spring(scale, {
-      toValue: Math.min((scale as any)._value + 0.3, 3),
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handleZoomOut = () => {
-    Animated.spring(scale, {
-      toValue: Math.max((scale as any)._value - 0.3, 0.5),
-      useNativeDriver: true,
-    }).start();
-  };
-
-  // Réinitialiser la vue
-  const resetView = () => {
-    Animated.parallel([
-      Animated.spring(scale, { toValue: 1, useNativeDriver: true }),
-      Animated.spring(translateX, { toValue: 0, useNativeDriver: true }),
-      Animated.spring(translateY, { toValue: 0, useNativeDriver: true }),
-    ]).start();
-  };
-
-  // Pan responder pour déplacer l'image
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderMove: (_, gestureState) => {
-        translateX.setValue(gestureState.dx);
-        translateY.setValue(gestureState.dy);
-      },
-      onPanResponderRelease: () => {},
-    })
-  ).current;
 
   const handleReserve = () => {
     if (selectedAreas.length === 0) {
@@ -221,6 +158,53 @@ const FloorPlanModal = ({
   };
 
   const totalPrice = selectedAreas.reduce((sum) => sum + product.price, 0);
+
+  // Convert areas to Excalidraw elements
+  const CANVAS_WIDTH = 2000;
+  const CANVAS_HEIGHT = 1500;
+
+  const excalidrawElements = areas.map((area) => {
+    const isSelected = selectedAreas.some((a) => a.id === area.id);
+    const x = (area.x / 100) * CANVAS_WIDTH;
+    const y = (area.y / 100) * CANVAS_HEIGHT;
+    const w = (area.width / 100) * CANVAS_WIDTH;
+    const h = (area.height / 100) * CANVAS_HEIGHT;
+
+    return {
+      id: area.id,
+      type: "rectangle",
+      x: x,
+      y: y,
+      width: w,
+      height: h,
+      backgroundColor: isSelected
+        ? "#1DB954" // Selected: Solid Green
+        : area.available
+          ? "#dcfce7" // Available: Light Green
+          : "#fee2e2", // Occupied: Light Red
+      strokeColor: isSelected ? "#14532d" : area.available ? "#166534" : "#991b1b",
+      strokeStyle: "solid",
+      fillStyle: "solid",
+      strokeWidth: 2,
+      roughness: 0,
+      opacity: 100,
+      roundness: { type: 3 },
+      // Custom data to identify it
+      customData: { ...area },
+      // Label text (simple approximation using a bound text element would be complex, 
+      // skipping text inside rect for now or adding separate text element is better).
+      // For simplicity, let's just color code.
+    };
+  });
+
+  // Handle selection from Excalidraw
+  const handleElementSelect = (elementId: string | null) => {
+    if (!elementId) return;
+    const area = areas.find(a => a.id === elementId);
+    if (area) {
+      toggleArea(area);
+    }
+  };
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -260,13 +244,12 @@ const FloorPlanModal = ({
                   key={area.id}
                   onPress={() => toggleArea(area)}
                   disabled={!area.available}
-                  className={`mb-2 p-3 rounded-xl border-2 ${
-                    !area.available
-                      ? "bg-gray-700/50 border-gray-600 opacity-50"
-                      : isSelected
-                        ? "bg-primary/20 border-primary"
-                        : "bg-surface border-gray-600"
-                  } ${isFocused ? "scale-105" : ""}`}
+                  className={`mb-2 p-3 rounded-xl border-2 ${!area.available
+                    ? "bg-gray-700/50 border-gray-600 opacity-50"
+                    : isSelected
+                      ? "bg-primary/20 border-primary"
+                      : "bg-surface border-gray-600"
+                    } ${isFocused ? "scale-105" : ""}`}
                 >
                   <View className="flex-row items-start justify-between">
                     <View className="flex-1">
@@ -277,9 +260,8 @@ const FloorPlanModal = ({
                           color={area.available ? "#1DB954" : "#666"}
                         />
                         <Text
-                          className={`font-semibold text-sm ${
-                            area.available ? "text-text-primary" : "text-gray-500"
-                          }`}
+                          className={`font-semibold text-sm ${area.available ? "text-text-primary" : "text-gray-500"
+                            }`}
                         >
                           {area.name}
                         </Text>
@@ -289,9 +271,8 @@ const FloorPlanModal = ({
                         Capacité: {area.capacity} pers.
                       </Text>
                       <Text
-                        className={`text-xs mt-1 font-semibold ${
-                          area.available ? "text-primary" : "text-red-400"
-                        }`}
+                        className={`text-xs mt-1 font-semibold ${area.available ? "text-primary" : "text-red-400"
+                          }`}
                       >
                         {area.available ? `$${product.price}` : "Occupé"}
                       </Text>
@@ -334,100 +315,20 @@ const FloorPlanModal = ({
         {/* ZONE PRINCIPALE - Plan plein écran */}
         <View className="flex-1 bg-background">
           {/* Header avec contrôles */}
-          <View className="absolute top-0 left-0 right-0 z-10 bg-background/95 px-4 pt-12 pb-4 flex-row items-center justify-between">
-            <View className="flex-row items-center gap-2">
-              <TouchableOpacity
-                onPress={handleZoomIn}
-                className="bg-surface p-2 rounded-lg"
-              >
-                <Ionicons name="add" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleZoomOut}
-                className="bg-surface p-2 rounded-lg"
-              >
-                <Ionicons name="remove" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={resetView}
-                className="bg-surface px-3 py-2 rounded-lg"
-              >
-                <Text className="text-text-primary text-xs font-semibold">Réinitialiser</Text>
-              </TouchableOpacity>
-            </View>
-
+          <View className="absolute top-0 left-0 right-0 z-10 bg-background/95 px-4 pt-12 pb-4 flex-row items-center justify-between pointer-events-none">
+            {/* Hide Zoom controls as Excalidraw handles them */}
+            <View />
             <TouchableOpacity onPress={onClose} className="bg-surface p-2 rounded-lg">
               <Ionicons name="close" size={24} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
-          {/* Plan avec zones interactives */}
-          <View className="flex-1 items-center justify-center">
-            <Animated.View
-              {...panResponder.panHandlers}
-              style={{
-                width: PLAN_WIDTH,
-                height: SCREEN_HEIGHT * 0.8,
-                transform: [{ scale }, { translateX }, { translateY }],
-              }}
-            >
-              <Image
-                source={require("@/assets/images/floorplan.jpg")}
-                style={{ width: "100%", height: "100%" }}
-                contentFit="cover"
-              />
-
-              {/* Overlay avec zones */}
-              <View className="absolute inset-0">
-                {areas.map((area) => {
-                  const isSelected = selectedAreas.some((a) => a.id === area.id);
-                  const isFocused = focusedArea === area.id;
-
-                  return (
-                    <TouchableOpacity
-                      key={area.id}
-                      onPress={() => toggleArea(area)}
-                      disabled={!area.available}
-                      style={{
-                        position: "absolute",
-                        left: `${area.x}%`,
-                        top: `${area.y}%`,
-                        width: `${area.width}%`,
-                        height: `${area.height}%`,
-                        backgroundColor: isSelected
-                          ? "rgba(29, 185, 84, 0.6)"
-                          : area.available
-                            ? "rgba(29, 185, 84, 0.2)"
-                            : "rgba(239, 68, 68, 0.3)",
-                        borderWidth: 2,
-                        borderColor: isSelected
-                          ? "#1DB954"
-                          : area.available
-                            ? "rgba(29, 185, 84, 0.5)"
-                            : "#EF4444",
-                        borderRadius: 8,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        opacity: isFocused ? 1 : 0.9,
-                        transform: [{ scale: isFocused ? 1.1 : 1 }],
-                      }}
-                    >
-                      <Ionicons
-                        name={getAreaIcon(product.category)}
-                        size={18}
-                        color={area.available ? "#FFFFFF" : "#999"}
-                      />
-                      <Text className="text-white font-bold text-xs mt-1">
-                        {area.name}
-                      </Text>
-                      {!area.available && (
-                        <Text className="text-red-300 text-xs">Occupé</Text>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </Animated.View>
+          {/* Plan avec Excalidraw */}
+          <View className="flex-1 overflow-hidden">
+            <ExcalidrawViewer
+              initialElements={excalidrawElements}
+              onSelectElement={handleElementSelect}
+            />
           </View>
 
           {/* Bouton flottant de réservation */}
@@ -465,7 +366,7 @@ const FloorPlanModal = ({
           )}
 
           {/* Instructions */}
-          {selectedAreas.length === 0 && (
+          {/* {selectedAreas.length === 0 && (
             <View className="absolute bottom-6 left-0 right-0 items-center z-10">
               <View className="bg-surface/90 px-6 py-3 rounded-full mx-4">
                 <Text className="text-text-primary text-xs text-center">
@@ -473,7 +374,7 @@ const FloorPlanModal = ({
                 </Text>
               </View>
             </View>
-          )}
+          )} */}
         </View>
       </View>
     </Modal>
