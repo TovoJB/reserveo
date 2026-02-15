@@ -1,5 +1,8 @@
 "use client";
 
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { ThemeToggle } from "@/components/theme-toggle";
+
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +15,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
   Table,
@@ -22,31 +26,44 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetDescription,
+  SheetFooter,
+} from "@/components/ui/sheet";
+import {
   Search,
   SlidersHorizontal,
   ArrowUpDown,
   Upload,
   PieChart,
-  Snowflake,
-  Flame,
   Check,
   X,
   User,
   Mail,
-  Hand,
   Activity,
-  Globe,
   ArrowUp,
   ArrowDown,
-  Linkedin,
+  Facebook,
   Phone,
-  Users2,
   Target,
-  Zap,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Sparkles,
+  Share2,
+  Ban,
+  ShieldCheck,
+  History,
+  QrCode,
+  MessageCircle,
+  Plus,
+  Info,
+  Calendar,
 } from "lucide-react";
 import {
   Select,
@@ -55,10 +72,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { leads, LeadType, LeadStatus, LeadSource } from "@/mock-data/dashboard";
+import { Badge } from "@/components/ui/badge";
+import { clients as initialClients, Client, ClientStatus, ClientRestriction } from "@/mock-data/dashboard";
 import { useDashboardStore } from "@/store/dashboard-store";
 
-type SortField = "name" | "email" | "followUp" | "status" | "score";
+type SortField = "name" | "email" | "lastInteraction" | "status" | "bookingCount";
 type SortOrder = "asc" | "desc";
 
 function getSortIcon(
@@ -74,176 +92,110 @@ function getSortIcon(
   );
 }
 
-function TypeBadge({ type }: { type: LeadType }) {
-  if (type === "cold") {
-    return (
-      <div
-        className="flex items-center gap-1 px-2 py-1 rounded-lg border border-cyan-500/40 w-fit"
-        style={{
-          backgroundImage:
-            "linear-gradient(90deg, rgba(6, 182, 212, 0.12) 0%, rgba(6, 182, 212, 0.06) 30%, rgba(6, 182, 212, 0) 100%), linear-gradient(90deg, hsl(var(--card)) 0%, hsl(var(--card)) 100%)",
-        }}
-      >
-        <Snowflake className="size-3.5 text-cyan-400" />
-        <span className="text-sm font-medium text-cyan-400">Cold</span>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="flex items-center gap-1 px-2 py-1 rounded-lg border border-pink-500/40 w-fit"
-      style={{
-        backgroundImage:
-          "linear-gradient(90deg, rgba(236, 72, 153, 0.12) 0%, rgba(236, 72, 153, 0.06) 30%, rgba(236, 72, 153, 0) 100%), linear-gradient(90deg, hsl(var(--card)) 0%, hsl(var(--card)) 100%)",
-      }}
-    >
-      <Flame className="size-3.5 text-pink-400" />
-      <span className="text-sm font-medium text-pink-400">Warm</span>
-    </div>
-  );
-}
-
-function StatusBadge({ status }: { status: LeadStatus }) {
-  if (status === "closed") {
-    return (
-      <div
-        className="flex items-center gap-1 px-2 py-1 rounded-lg border border-emerald-500/40 w-fit"
-        style={{
-          backgroundImage:
-            "linear-gradient(90deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.06) 30%, rgba(16, 185, 129, 0) 100%), linear-gradient(90deg, hsl(var(--card)) 0%, hsl(var(--card)) 100%)",
-        }}
-      >
-        <Check className="size-3.5 text-emerald-400" />
-        <span className="text-sm font-medium text-emerald-400">Closed</span>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="flex items-center gap-1 px-2 py-1 rounded-lg border border-amber-500/40 w-fit"
-      style={{
-        backgroundImage:
-          "linear-gradient(90deg, rgba(245, 158, 11, 0.12) 0%, rgba(245, 158, 11, 0.06) 30%, rgba(245, 158, 11, 0) 100%), linear-gradient(90deg, hsl(var(--card)) 0%, hsl(var(--card)) 100%)",
-      }}
-    >
-      <X className="size-3.5 text-amber-400" />
-      <span className="text-sm font-medium text-amber-400">Lost</span>
-    </div>
-  );
-}
-
-function ScoreBadge({ score }: { score: number }) {
-  const getScoreStyle = () => {
-    if (score >= 80)
-      return { barClass: "bg-emerald-500", textClass: "text-emerald-400" };
-    if (score >= 50)
-      return { barClass: "bg-cyan-500", textClass: "text-cyan-400" };
-    return { barClass: "bg-amber-500", textClass: "text-amber-400" };
+function StatusBadge({
+  status,
+  onToggle
+}: {
+  status: ClientStatus;
+  onToggle: (newStatus: ClientStatus) => void
+}) {
+  const configs: Record<ClientStatus, { label: string, color: string, icon: any }> = {
+    active: { label: "Actif", color: "border-emerald-500/40 text-emerald-400 bg-emerald-500/10", icon: Check },
+    subscribed: { label: "Abonné", color: "border-blue-500/40 text-blue-400 bg-blue-500/10", icon: ShieldCheck },
+    banned: { label: "Banni", color: "border-red-500/40 text-red-400 bg-red-500/10", icon: Ban },
   };
 
-  const { barClass, textClass } = getScoreStyle();
+  const config = configs[status];
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="relative w-12 h-1.5 rounded-full bg-muted overflow-hidden">
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <div
-          className={`absolute inset-y-0 left-0 rounded-full transition-all ${barClass}`}
-          style={{ width: `${score}%` }}
-        />
-      </div>
-      <span className={`text-xs font-semibold min-w-[28px] ${textClass}`}>
-        {score}
-      </span>
-    </div>
+          className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border w-fit cursor-pointer hover:opacity-80 transition-all ${config.color}`}
+        >
+          <config.icon className="size-3.5" />
+          <span className="text-sm font-medium">{config.label}</span>
+        </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuLabel>Changer le statut</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => onToggle("active")}>
+          <Check className="size-4 mr-2 text-emerald-400" /> Actif
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onToggle("subscribed")}>
+          <ShieldCheck className="size-4 mr-2 text-blue-400" /> Abonné
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onToggle("banned")}>
+          <Ban className="size-4 mr-2 text-red-400" /> Banni
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
-function SourceBadge({ source }: { source: LeadSource }) {
-  const sourceConfig: Record<
-    LeadSource,
-    { icon: React.ReactNode; label: string; bgClass: string; textClass: string }
-  > = {
-    linkedin: {
-      icon: <Linkedin className="size-3" />,
-      label: "LinkedIn",
-      bgClass: "bg-blue-500/10",
-      textClass: "text-blue-400",
-    },
-    google: {
-      icon: <Search className="size-3" />,
-      label: "Google",
-      bgClass: "bg-red-500/10",
-      textClass: "text-red-400",
-    },
-    referral: {
-      icon: <Users2 className="size-3" />,
-      label: "Referral",
-      bgClass: "bg-violet-500/10",
-      textClass: "text-violet-400",
-    },
-    website: {
-      icon: <Globe className="size-3" />,
-      label: "Website",
-      bgClass: "bg-cyan-500/10",
-      textClass: "text-cyan-400",
-    },
-    "cold-call": {
-      icon: <Phone className="size-3" />,
-      label: "Cold Call",
-      bgClass: "bg-orange-500/10",
-      textClass: "text-orange-400",
-    },
+function RestrictionBadge({
+  restriction,
+  onToggle
+}: {
+  restriction: ClientRestriction;
+  onToggle: (newRestriction: ClientRestriction) => void
+}) {
+  const configs: Record<ClientRestriction, { label: string, color: string }> = {
+    none: { label: "Aucune", color: "bg-muted text-muted-foreground" },
+    "tables-only": { label: "Tables uniquement", color: "bg-amber-500/10 text-amber-500 border-amber-500/40" },
+    "chairs-only": { label: "Chaises uniquement", color: "bg-orange-500/10 text-orange-500 border-orange-500/40" },
+    all: { label: "Tout restreindre", color: "bg-red-500/10 text-red-500 border-red-500/40" },
   };
 
-  const config = sourceConfig[source];
+  const config = configs[restriction];
 
   return (
-    <div
-      className={`flex items-center gap-1.5 px-2 py-1 rounded-md w-fit ${config.bgClass}`}
-    >
-      <span className={config.textClass}>{config.icon}</span>
-      <span className={`text-xs font-medium ${config.textClass}`}>
-        {config.label}
-      </span>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <div
+          className={`flex items-center px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:opacity-80 transition-all ${config.color}`}
+        >
+          {config.label}
+        </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuLabel>Restrictions</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => onToggle("none")}>Pas de restriction</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onToggle("tables-only")}>Tables seulement</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onToggle("chairs-only")}>Chaises seulement</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onToggle("all")}>Tout restreindre</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
 export function ClientsTable() {
   const {
     searchQuery,
-    typeFilter,
-    statusFilter,
-    sourceFilter,
     setSearchQuery,
-    setTypeFilter,
-    setStatusFilter,
-    setSourceFilter,
     clearFilters,
   } = useDashboardStore();
 
+  const [clients, setClients] = useState<Client[]>(initialClients);
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
-  const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
+  const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [isAddClientOpen, setIsAddClientOpen] = useState(false);
+  const [qrMode, setQrMode] = useState(false);
 
-  const filteredAndSortedLeads = useMemo(() => {
-    const result = leads.filter((lead) => {
+  const filteredAndSortedClients = useMemo(() => {
+    const result = clients.filter((client) => {
       const matchesSearch =
         searchQuery === "" ||
-        lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        lead.email.toLowerCase().includes(searchQuery.toLowerCase());
+        client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        client.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        client.phone.includes(searchQuery);
 
-      const matchesType = typeFilter === "all" || lead.type === typeFilter;
-      const matchesStatus =
-        statusFilter === "all" || lead.status === statusFilter;
-      const matchesSource =
-        sourceFilter === "all" || lead.source === sourceFilter;
-
-      return matchesSearch && matchesType && matchesStatus && matchesSource;
+      return matchesSearch;
     });
 
     result.sort((a, b) => {
@@ -255,34 +207,35 @@ export function ClientsTable() {
         case "email":
           comparison = a.email.localeCompare(b.email);
           break;
-        case "followUp":
-          comparison = a.followUp.localeCompare(b.followUp);
+        case "lastInteraction":
+          comparison = a.lastInteraction.localeCompare(b.lastInteraction);
           break;
         case "status":
           comparison = a.status.localeCompare(b.status);
           break;
-        case "score":
-          comparison = a.score - b.score;
+        case "bookingCount":
+          comparison = a.bookingCount - b.bookingCount;
           break;
       }
       return sortOrder === "asc" ? comparison : -comparison;
     });
 
     return result;
-  }, [
-    searchQuery,
-    typeFilter,
-    statusFilter,
-    sourceFilter,
-    sortField,
-    sortOrder,
-  ]);
+  }, [clients, searchQuery, sortField, sortOrder]);
 
-  const totalPages = Math.ceil(filteredAndSortedLeads.length / itemsPerPage);
-  const paginatedLeads = useMemo(() => {
+  const totalPages = Math.ceil(filteredAndSortedClients.length / itemsPerPage);
+  const paginatedClients = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredAndSortedLeads.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredAndSortedLeads, currentPage, itemsPerPage]);
+    return filteredAndSortedClients.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredAndSortedClients, currentPage, itemsPerPage]);
+
+  const toggleStatus = (clientId: string, newStatus: ClientStatus) => {
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, status: newStatus } : c));
+  };
+
+  const toggleRestriction = (clientId: string, newRestriction: ClientRestriction) => {
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, restrictions: newRestriction } : c));
+  };
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -294,432 +247,154 @@ export function ClientsTable() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedLeads.length === paginatedLeads.length) {
-      setSelectedLeads([]);
+    if (selectedClients.length === paginatedClients.length) {
+      setSelectedClients([]);
     } else {
-      setSelectedLeads(paginatedLeads.map((lead) => lead.id));
+      setSelectedClients(paginatedClients.map((c) => c.id));
     }
   };
 
-  const toggleSelectLead = (id: string) => {
-    setSelectedLeads((prev) =>
+  const toggleSelectClient = (id: string) => {
+    setSelectedClients((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
   };
 
-  const hasActiveFilters =
-    searchQuery !== "" ||
-    typeFilter !== "all" ||
-    statusFilter !== "all" ||
-    sourceFilter !== "all";
-
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    setSelectedLeads([]);
+    setSelectedClients([]);
   };
 
   const handleItemsPerPageChange = (value: string) => {
     setItemsPerPage(Number(value));
     setCurrentPage(1);
-    setSelectedLeads([]);
+    setSelectedClients([]);
   };
 
   return (
-    <div className="bg-card text-card-foreground rounded-xl border overflow-hidden">
+    <div className="w-full h-full flex flex-col bg-card text-card-foreground overflow-hidden">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3.5 border-b">
         <div className="flex items-center gap-3">
-          <h3 className="font-medium text-base">Lead Management</h3>
+          <SidebarTrigger className="-ml-2" />
+          <h3 className="font-semibold text-lg tracking-tight">Lead Management</h3>
           <div className="h-5 w-px bg-border hidden sm:block" />
           <div className="hidden sm:flex items-center gap-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
               <Input
-                placeholder="Search"
+                placeholder="Rechercher (Nom, Email, Tel...)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 h-8 w-[200px] text-sm bg-muted/50 border-border/50"
+                className="pl-8 h-8 w-[250px] text-sm bg-muted/50 border-border/50"
               />
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1.5 bg-muted/50 border-border/50"
-                >
-                  <SlidersHorizontal className="size-3.5" />
-                  <span>Filter</span>
-                  {hasActiveFilters && (
-                    <span className="size-1.5 rounded-full bg-primary" />
-                  )}
+            <Sheet open={isAddClientOpen} onOpenChange={setIsAddClientOpen}>
+              <SheetTrigger asChild>
+                <Button size="sm" className="h-8 gap-1.5 bg-primary text-primary-foreground">
+                  <Plus className="size-3.5" />
+                  Nouveau Client
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                <div className="px-2 py-1.5">
-                  <p className="text-xs font-medium text-muted-foreground mb-1.5">
-                    Type
-                  </p>
-                  <div className="space-y-1">
-                    <DropdownMenuCheckboxItem
-                      checked={typeFilter === "all"}
-                      onCheckedChange={() => setTypeFilter("all")}
-                    >
-                      All Types
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={typeFilter === "cold"}
-                      onCheckedChange={() => setTypeFilter("cold")}
-                    >
-                      <Snowflake className="size-3 mr-1.5 text-cyan-400" />
-                      Cold
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={typeFilter === "warm"}
-                      onCheckedChange={() => setTypeFilter("warm")}
-                    >
-                      <Flame className="size-3 mr-1.5 text-pink-400" />
-                      Warm
-                    </DropdownMenuCheckboxItem>
-                  </div>
-                </div>
-                <DropdownMenuSeparator />
-                <div className="px-2 py-1.5">
-                  <p className="text-xs font-medium text-muted-foreground mb-1.5">
-                    Status
-                  </p>
-                  <div className="space-y-1">
-                    <DropdownMenuCheckboxItem
-                      checked={statusFilter === "all"}
-                      onCheckedChange={() => setStatusFilter("all")}
-                    >
-                      All Status
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={statusFilter === "closed"}
-                      onCheckedChange={() => setStatusFilter("closed")}
-                    >
-                      <Check className="size-3 mr-1.5 text-emerald-400" />
-                      Closed
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={statusFilter === "lost"}
-                      onCheckedChange={() => setStatusFilter("lost")}
-                    >
-                      <X className="size-3 mr-1.5 text-amber-400" />
-                      Lost
-                    </DropdownMenuCheckboxItem>
-                  </div>
-                </div>
-                <DropdownMenuSeparator />
-                <div className="px-2 py-1.5">
-                  <p className="text-xs font-medium text-muted-foreground mb-1.5">
-                    Source
-                  </p>
-                  <div className="space-y-1">
-                    <DropdownMenuCheckboxItem
-                      checked={sourceFilter === "all"}
-                      onCheckedChange={() => setSourceFilter("all")}
-                    >
-                      All Sources
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={sourceFilter === "linkedin"}
-                      onCheckedChange={() => setSourceFilter("linkedin")}
-                    >
-                      <Linkedin className="size-3 mr-1.5 text-blue-400" />
-                      LinkedIn
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={sourceFilter === "google"}
-                      onCheckedChange={() => setSourceFilter("google")}
-                    >
-                      <Search className="size-3 mr-1.5 text-red-400" />
-                      Google
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={sourceFilter === "referral"}
-                      onCheckedChange={() => setSourceFilter("referral")}
-                    >
-                      <Users2 className="size-3 mr-1.5 text-violet-400" />
-                      Referral
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={sourceFilter === "website"}
-                      onCheckedChange={() => setSourceFilter("website")}
-                    >
-                      <Globe className="size-3 mr-1.5 text-cyan-400" />
-                      Website
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={sourceFilter === "cold-call"}
-                      onCheckedChange={() => setSourceFilter("cold-call")}
-                    >
-                      <Phone className="size-3 mr-1.5 text-orange-400" />
-                      Cold Call
-                    </DropdownMenuCheckboxItem>
-                  </div>
-                </div>
-                {hasActiveFilters && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={clearFilters}>
-                      Clear all filters
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </SheetTrigger>
+              <SheetContent side="right" className="sm:max-w-md">
+                <SheetHeader>
+                  <SheetTitle>Ajouter un nouveau client</SheetTitle>
+                  <SheetDescription>
+                    Créez un profil client manuellement ou via scanner QR.
+                  </SheetDescription>
+                </SheetHeader>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1.5 bg-muted/50 border-border/50"
-                >
-                  <ArrowUpDown className="size-3.5" />
-                  <span>Sort</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => toggleSort("name")}>
-                  Name{" "}
-                  {sortField === "name" && (sortOrder === "asc" ? "↑" : "↓")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toggleSort("email")}>
-                  Email{" "}
-                  {sortField === "email" && (sortOrder === "asc" ? "↑" : "↓")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toggleSort("followUp")}>
-                  Follow-up{" "}
-                  {sortField === "followUp" &&
-                    (sortOrder === "asc" ? "↑" : "↓")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toggleSort("status")}>
-                  Status{" "}
-                  {sortField === "status" && (sortOrder === "asc" ? "↑" : "↓")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toggleSort("score")}>
-                  Score{" "}
-                  {sortField === "score" && (sortOrder === "asc" ? "↑" : "↓")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <div className="flex gap-4 border-b my-6 p-1 bg-muted rounded-lg">
+                  <Button
+                    variant={!qrMode ? "secondary" : "ghost"}
+                    className="flex-1 text-xs h-8"
+                    onClick={() => setQrMode(false)}
+                  >
+                    Manuel
+                  </Button>
+                  <Button
+                    variant={qrMode ? "secondary" : "ghost"}
+                    className="flex-1 text-xs h-8"
+                    onClick={() => setQrMode(true)}
+                  >
+                    Scanner QR
+                  </Button>
+                </div>
+
+                {!qrMode ? (
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium uppercase text-muted-foreground">Nom Complet</label>
+                      <Input placeholder="Ex: Jean Rakoto" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium uppercase text-muted-foreground">Email</label>
+                      <Input placeholder="jean@example.mg" type="email" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium uppercase text-muted-foreground">Téléphone</label>
+                      <Input placeholder="034 XX XXX XX" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center space-y-4 py-12 bg-muted/30 rounded-xl border border-dashed">
+                    <div className="size-48 bg-white p-4 rounded-xl border-4 border-primary/20 flex items-center justify-center relative overflow-hidden group cursor-pointer">
+                      <QrCode className="size-32 text-slate-800 drop-shadow-sm" />
+                      <div className="absolute inset-0 bg-primary/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-xs font-bold text-primary bg-background px-3 py-1 rounded-full shadow-sm">SIMULER SCAN</span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-center text-muted-foreground px-8">
+                      Générez un QR Code pour que le client s'inscrive via son application Reserveo.
+                    </p>
+                    <Button variant="outline" className="gap-2">
+                      <Upload className="size-4" />
+                      Charger une image
+                    </Button>
+                  </div>
+                )}
+
+                <SheetFooter className="mt-8">
+                  <Button className="w-full" onClick={() => setIsAddClientOpen(false)}>Confirmer l'ajout</Button>
+                </SheetFooter>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Actions tools */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5 bg-muted/50 border-border/50"
-              >
-                <Upload className="size-3.5" />
-                <span className="hidden sm:inline">Export/Import</span>
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 bg-muted/50 border-border/50">
+                <Sparkles className="size-3.5" />
+                <span className="text-sm">Ask AI</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>Export as CSV</DropdownMenuItem>
-              <DropdownMenuItem>Export as Excel</DropdownMenuItem>
-              <DropdownMenuItem>Export as PDF</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Import from CSV</DropdownMenuItem>
-              <DropdownMenuItem>Import from Excel</DropdownMenuItem>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem>Segmenter les clients</DropdownMenuItem>
+              <DropdownMenuItem>Analyser le taux de bannissement</DropdownMenuItem>
+              <DropdownMenuItem>Prédire les abonnements</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8 bg-muted/50 border-border/50"
-              >
-                <PieChart className="size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>View analytics</DropdownMenuItem>
-              <DropdownMenuItem>Lead distribution</DropdownMenuItem>
-              <DropdownMenuItem>Conversion rates</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Generate report</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+
+          <div className="h-8 w-px bg-border mx-1 hidden sm:block" />
+          <ThemeToggle />
         </div>
       </div>
 
-      <div className="sm:hidden flex flex-wrap items-center gap-2 px-4 py-3 border-b">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 h-8 w-full text-sm bg-muted/50 border-border/50"
-          />
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 gap-1.5 bg-muted/50 border-border/50"
-            >
-              <SlidersHorizontal className="size-3.5" />
-              {hasActiveFilters && (
-                <span className="size-1.5 rounded-full bg-primary" />
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <div className="px-2 py-1.5">
-              <p className="text-xs font-medium text-muted-foreground mb-1.5">
-                Type
-              </p>
-              <div className="space-y-1">
-                <DropdownMenuCheckboxItem
-                  checked={typeFilter === "all"}
-                  onCheckedChange={() => setTypeFilter("all")}
-                >
-                  All Types
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={typeFilter === "cold"}
-                  onCheckedChange={() => setTypeFilter("cold")}
-                >
-                  Cold
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={typeFilter === "warm"}
-                  onCheckedChange={() => setTypeFilter("warm")}
-                >
-                  Warm
-                </DropdownMenuCheckboxItem>
-              </div>
-            </div>
-            <DropdownMenuSeparator />
-            <div className="px-2 py-1.5">
-              <p className="text-xs font-medium text-muted-foreground mb-1.5">
-                Status
-              </p>
-              <div className="space-y-1">
-                <DropdownMenuCheckboxItem
-                  checked={statusFilter === "all"}
-                  onCheckedChange={() => setStatusFilter("all")}
-                >
-                  All Status
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={statusFilter === "closed"}
-                  onCheckedChange={() => setStatusFilter("closed")}
-                >
-                  Closed
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={statusFilter === "lost"}
-                  onCheckedChange={() => setStatusFilter("lost")}
-                >
-                  Lost
-                </DropdownMenuCheckboxItem>
-              </div>
-            </div>
-            <DropdownMenuSeparator />
-            <div className="px-2 py-1.5">
-              <p className="text-xs font-medium text-muted-foreground mb-1.5">
-                Source
-              </p>
-              <div className="space-y-1">
-                <DropdownMenuCheckboxItem
-                  checked={sourceFilter === "all"}
-                  onCheckedChange={() => setSourceFilter("all")}
-                >
-                  All Sources
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={sourceFilter === "linkedin"}
-                  onCheckedChange={() => setSourceFilter("linkedin")}
-                >
-                  LinkedIn
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={sourceFilter === "google"}
-                  onCheckedChange={() => setSourceFilter("google")}
-                >
-                  Google
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={sourceFilter === "referral"}
-                  onCheckedChange={() => setSourceFilter("referral")}
-                >
-                  Referral
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={sourceFilter === "website"}
-                  onCheckedChange={() => setSourceFilter("website")}
-                >
-                  Website
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={sourceFilter === "cold-call"}
-                  onCheckedChange={() => setSourceFilter("cold-call")}
-                >
-                  Cold Call
-                </DropdownMenuCheckboxItem>
-              </div>
-            </div>
-            {hasActiveFilters && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={clearFilters}>
-                  Clear all filters
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 bg-muted/50 border-border/50"
-            >
-              <ArrowUpDown className="size-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => toggleSort("name")}>
-              Name
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => toggleSort("email")}>
-              Email
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => toggleSort("followUp")}>
-              Follow-up
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => toggleSort("status")}>
-              Status
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => toggleSort("score")}>
-              Score
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      <div className="overflow-x-auto">
+      {/* Table Content */}
+      <div className="flex-1 overflow-auto">
         <Table>
           <TableHeader>
-            <TableRow className="hover:bg-transparent bg-muted/30">
-              <TableHead className="w-[160px]">
+            <TableRow className="hover:bg-transparent bg-muted/30 sticky top-0 z-10">
+              <TableHead className="w-[200px]">
                 <div className="flex items-center gap-2">
                   <Checkbox
                     checked={
-                      selectedLeads.length === paginatedLeads.length &&
-                      paginatedLeads.length > 0
+                      selectedClients.length === paginatedClients.length &&
+                      paginatedClients.length > 0
                     }
                     onCheckedChange={toggleSelectAll}
                     className="border-border/50 bg-background/70"
@@ -728,114 +403,149 @@ export function ClientsTable() {
                     className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
                     onClick={() => toggleSort("name")}
                   >
-                    <span>Name</span>
+                    <span>Client</span>
                     {getSortIcon(sortField, sortOrder, "name")}
                   </button>
                 </div>
               </TableHead>
-              <TableHead className="w-[85px]">
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <User className="size-3.5" />
-                  <span>Type</span>
-                </div>
-              </TableHead>
-              <TableHead className="w-[180px]">
+              <TableHead className="w-[120px]">Statut</TableHead>
+              <TableHead className="w-[150px]">Restrictions</TableHead>
+              <TableHead className="w-[180px]">Contact</TableHead>
+              <TableHead className="w-[140px]">Réseaux</TableHead>
+              <TableHead className="w-[160px]">
                 <button
                   className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
-                  onClick={() => toggleSort("email")}
-                >
-                  <Mail className="size-3.5" />
-                  <span>Email</span>
-                  {getSortIcon(sortField, sortOrder, "email")}
-                </button>
-              </TableHead>
-              <TableHead className="w-[95px]">
-                <button
-                  className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
-                  onClick={() => toggleSort("followUp")}
-                >
-                  <Hand className="size-3.5" />
-                  <span>Follow-up</span>
-                  {getSortIcon(sortField, sortOrder, "followUp")}
-                </button>
-              </TableHead>
-              <TableHead className="w-[90px]">
-                <button
-                  className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
-                  onClick={() => toggleSort("status")}
+                  onClick={() => toggleSort("lastInteraction")}
                 >
                   <Activity className="size-3.5" />
-                  <span>Status</span>
-                  {getSortIcon(sortField, sortOrder, "status")}
+                  <span>Dernière activité</span>
+                  {getSortIcon(sortField, sortOrder, "lastInteraction")}
                 </button>
               </TableHead>
-              <TableHead className="w-[85px]">
-                <button
-                  className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
-                  onClick={() => toggleSort("score")}
-                >
-                  <Zap className="size-3.5" />
-                  <span>Score</span>
-                  {getSortIcon(sortField, sortOrder, "score")}
-                </button>
-              </TableHead>
-              <TableHead className="w-[95px]">
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Target className="size-3.5" />
-                  <span>Source</span>
-                </div>
-              </TableHead>
-              <TableHead className="w-[120px]">
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Globe className="size-3.5" />
-                  <span>Website</span>
-                </div>
-              </TableHead>
+              <TableHead className="w-[80px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedLeads.map((lead) => (
-              <TableRow key={lead.id} className="border-border/50">
+            {paginatedClients.map((client) => (
+              <TableRow key={client.id} className="border-border/50 group">
                 <TableCell>
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-3">
                     <Checkbox
-                      checked={selectedLeads.includes(lead.id)}
-                      onCheckedChange={() => toggleSelectLead(lead.id)}
+                      checked={selectedClients.includes(client.id)}
+                      onCheckedChange={() => toggleSelectClient(client.id)}
                       className="border-border/50 bg-background/70"
                     />
-                    <Avatar className="size-6">
-                      <AvatarImage src={lead.avatar} />
-                      <AvatarFallback className="text-xs">
-                        {lead.name[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="font-medium text-sm">{lead.name}</span>
+                    <div className="relative">
+                      <Avatar className="size-8">
+                        <AvatarImage src={client.avatar} />
+                        <AvatarFallback>{client.name[0]}</AvatarFallback>
+                      </Avatar>
+                      {client.status === "subscribed" && (
+                        <div className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full border-2 border-background p-0.5">
+                          <ShieldCheck className="size-2 text-white" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm">{client.name}</span>
+                      <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{client.email}</span>
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <TypeBadge type={lead.type} />
-                </TableCell>
-                <TableCell className="max-w-[180px]">
-                  <span className="text-sm truncate block">{lead.email}</span>
+                  <StatusBadge status={client.status} onToggle={(s) => toggleStatus(client.id, s)} />
                 </TableCell>
                 <TableCell>
-                  <span className="text-sm whitespace-nowrap">
-                    {lead.followUp}
-                  </span>
+                  <RestrictionBadge restriction={client.restrictions} onToggle={(r) => toggleRestriction(client.id, r)} />
                 </TableCell>
                 <TableCell>
-                  <StatusBadge status={lead.status} />
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <Phone className="size-3 text-muted-foreground" />
+                      {client.phone}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
+                      {client.email.split('@')[0]}@...
+                    </div>
+                  </div>
                 </TableCell>
                 <TableCell>
-                  <ScoreBadge score={lead.score} />
+                  <div className="flex items-center gap-2">
+                    {client.socials.facebook && (
+                      <div title="Facebook" className="size-7 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 hover:bg-blue-500 hover:text-white transition-colors cursor-pointer">
+                        <Facebook className="size-3.5" />
+                      </div>
+                    )}
+                    {client.socials.whatsapp && (
+                      <div title="WhatsApp" className="size-7 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 hover:bg-emerald-500 hover:text-white transition-colors cursor-pointer">
+                        <MessageCircle className="size-3.5" />
+                      </div>
+                    )}
+                    {!client.socials.facebook && !client.socials.whatsapp && (
+                      <span className="text-xs text-muted-foreground italic">Aucun</span>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
-                  <SourceBadge source={lead.source} />
+                  <div className="flex flex-col">
+                    <span className="text-xs font-medium">{client.lastInteraction}</span>
+                    <span className="text-[10px] text-muted-foreground">{client.bookingCount} réservations au total</span>
+                  </div>
                 </TableCell>
-                <TableCell className="max-w-[120px]">
-                  <span className="text-sm text-muted-foreground truncate block">
-                    {lead.website || "-"}
-                  </span>
+                <TableCell className="text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Info className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel>Actions rapide</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <Sheet>
+                        <SheetTrigger asChild>
+                          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                            <History className="size-4 mr-2" />
+                            Historique Complet
+                          </DropdownMenuItem>
+                        </SheetTrigger>
+                        <SheetContent side="right" className="sm:max-w-lg overflow-auto">
+                          <SheetHeader>
+                            <SheetTitle className="flex items-center gap-2">
+                              <History className="size-5" />
+                              Historique: {client.name}
+                            </SheetTitle>
+                          </SheetHeader>
+                          <div className="py-6 space-y-6">
+                            {client.history.map((h, i) => (
+                              <div key={h.id} className="relative pl-6 pb-6 border-l border-border last:pb-0">
+                                <div className="absolute left-[-5px] top-0 size-2.5 rounded-full bg-primary" />
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-bold">{h.space}</span>
+                                    <Badge variant={h.status === "completed" ? "secondary" : "destructive"} className="text-[9px] h-4">
+                                      {h.status}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                                    <Calendar className="size-3" />
+                                    {h.date}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            {client.history.length === 0 && (
+                              <p className="text-center py-12 text-sm text-muted-foreground">Aucun historique disponible.</p>
+                            )}
+                          </div>
+                        </SheetContent>
+                      </Sheet>
+                      <DropdownMenuItem className="text-red-500" onClick={() => toggleStatus(client.id, "banned")}>
+                        <Ban className="size-4 mr-2" />
+                        Bannir le client
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))}
@@ -843,20 +553,20 @@ export function ClientsTable() {
         </Table>
       </div>
 
-
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 border-t ">
+      {/* Footer / Pagination */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 border-t">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span>
-            Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+            Affichage de {(currentPage - 1) * itemsPerPage + 1} à{" "}
             {Math.min(
               currentPage * itemsPerPage,
-              filteredAndSortedLeads.length
+              filteredAndSortedClients.length
             )}{" "}
-            of {filteredAndSortedLeads.length} leads
+            sur {filteredAndSortedClients.length} clients
           </span>
           <div className="h-4 w-px bg-border hidden sm:block" />
           <div className="flex items-center gap-2">
-            <span className="hidden sm:inline">Show</span>
+            <span className="hidden sm:inline">Afficher</span>
             <Select
               value={itemsPerPage.toString()}
               onValueChange={handleItemsPerPageChange}
@@ -871,7 +581,6 @@ export function ClientsTable() {
                 <SelectItem value="50">50</SelectItem>
               </SelectContent>
             </Select>
-            <span className="hidden sm:inline">per page</span>
           </div>
         </div>
 

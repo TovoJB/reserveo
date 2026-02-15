@@ -59,14 +59,13 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   // { title: "Search", icon: Search, shortcut: "/" },
-  { title: "Clients", icon: UserPlus },
-  { title: "Dashboard", icon: BarChart3, isActive: true },
-  { title: "Tasks", icon: CheckSquare },
-  { title: "open plan", icon: Layers },
-  { title: "Calendar", icon: Calendar },
-  { title: "Bookings", icon: FileText },
-  { title: "Teams", icon: Users },
-  { title: "Company", icon: Building },
+  { title: "Gestion Clients", icon: UserPlus },
+  { title: "Dashboard", icon: BarChart3, isActive: true, shortcut: "/" },
+  { title: "Gestion Réservations", icon: CheckSquare },
+  { title: "Modèles d'Espaces", icon: Layers },
+  { title: "Calendrier", icon: Calendar },
+  { title: "Equipes", icon: Users },
+  // { title: "Company", icon: Building },
 ];
 
 const workgroups = [
@@ -225,26 +224,23 @@ export function DashboardSidebar({
                     asChild
                     isActive={
                       (item.title === "Dashboard" && !currentViewId && !searchParams?.get("view")) ||
-                      (item.title === "Calendar" && searchParams?.get("view") === "calendar") ||
-                      (item.title === "open plan" && searchParams?.get("view") === "bookmarks") ||
-                      (item.title === "Clients" && searchParams?.get("view") === "clients") ||
-                      (item.title === "Clients" && searchParams?.get("view") === "clients") ||
-                      (item.title === "Tasks" && searchParams?.get("view") === "tasks") ||
-                      (item.title === "Bookings" && searchParams?.get("view") === "bookings")
+                      (item.title === "Calendrier" && searchParams?.get("view") === "calendar") ||
+                      (item.title === "Modèles d'Espaces" && searchParams?.get("view") === "bookmarks") ||
+                      (item.title === "Gestion Clients" && searchParams?.get("view") === "clients") ||
+                      (item.title === "Gestion Réservations" && searchParams?.get("view") === "tasks")
                     }
                     className="h-7"
                   >
                     <Link href={
                       item.title === "Dashboard" ? "/" :
-                        item.title === "Calendar" ? "/?view=calendar" :
-                          item.title === "open plan" ? "/?view=bookmarks" :
-                            item.title === "Clients" ? "/?view=clients" :
-                              item.title === "Tasks" ? "/?view=tasks" :
-                                item.title === "Bookings" ? "/?view=bookings" : "#"
+                        item.title === "Calendrier" ? "/?view=calendar" :
+                          item.title === "Modèles d'Espaces" ? "/?view=bookmarks" :
+                            item.title === "Gestion Clients" ? "/?view=clients" :
+                              item.title === "Gestion Réservations" ? "/?view=tasks" : "#"
                     }>
                       <item.icon className="size-3.5" />
                       <span className="text-sm">{item.title}</span>
-                      {item.shortcut && (
+                      {'shortcut' in item && item.shortcut && (
                         <span className="ml-auto flex size-5 items-center justify-center rounded bg-muted text-[10px] font-medium text-muted-foreground">
                           {item.shortcut}
                         </span>

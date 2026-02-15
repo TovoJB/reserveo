@@ -32,20 +32,20 @@ interface BookmarksHeaderProps {
 }
 
 const sortOptions = [
-  { value: "date-newest", label: "Date Added (Newest)" },
-  { value: "date-oldest", label: "Date Added (Oldest)" },
-  { value: "alpha-az", label: "Alphabetical (A-Z)" },
-  { value: "alpha-za", label: "Alphabetical (Z-A)" },
+  { value: "date-newest", label: "Plus récent" },
+  { value: "date-oldest", label: "Plus ancien" },
+  { value: "alpha-az", label: "Alphabétique (A-Z)" },
+  { value: "alpha-za", label: "Alphabétique (Z-A)" },
 ] as const;
 
 const filterOptions = [
-  { value: "all", label: "All Bookmarks" },
-  { value: "favorites", label: "Favorites Only" },
-  { value: "with-tags", label: "With Tags" },
-  { value: "without-tags", label: "Without Tags" },
+  { value: "all", label: "Tous les espaces" },
+  { value: "favorites", label: "Coups de coeur" },
+  { value: "with-tags", label: "Avec tags" },
+  { value: "without-tags", label: "Sans tags" },
 ] as const;
 
-export function BookmarksHeader({ title = "Bookmarks" }: BookmarksHeaderProps) {
+export function BookmarksHeader({ title = "Modèles d'Espaces" }: BookmarksHeaderProps) {
   const {
     viewMode,
     setViewMode,
@@ -73,7 +73,7 @@ export function BookmarksHeader({ title = "Bookmarks" }: BookmarksHeaderProps) {
           <div className="relative hidden md:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input
-              placeholder="Search..."
+              placeholder="Rechercher..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 w-64 h-9"
@@ -103,12 +103,12 @@ export function BookmarksHeader({ title = "Bookmarks" }: BookmarksHeaderProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="hidden sm:flex">
                 <ArrowUpDown className="size-4" />
-                <span className="hidden lg:inline">{currentSort?.label.split(" ")[0]}</span>
+                <span className="hidden lg:inline">{currentSort?.label}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel className="text-xs text-muted-foreground">
-                Sort by
+                Trier par
               </DropdownMenuLabel>
               {sortOptions.map((option) => (
                 <DropdownMenuItem
@@ -135,13 +135,13 @@ export function BookmarksHeader({ title = "Bookmarks" }: BookmarksHeaderProps) {
               >
                 <SlidersHorizontal className="size-4" />
                 <span className="hidden lg:inline">
-                  {filterType !== "all" ? currentFilter?.label : "Filter"}
+                  {filterType !== "all" ? currentFilter?.label : "Filtrer"}
                 </span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel className="text-xs text-muted-foreground">
-                Filter by
+                Filtrer par
               </DropdownMenuLabel>
               {filterOptions.map((option) => (
                 <DropdownMenuItem
@@ -160,16 +160,16 @@ export function BookmarksHeader({ title = "Bookmarks" }: BookmarksHeaderProps) {
                     onClick={() => setFilterType("all")}
                     className="text-muted-foreground"
                   >
-                    Clear filter
+                    Réinitialiser
                   </DropdownMenuItem>
                 </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button size="sm" className="hidden sm:flex">
+          <Button size="sm" className="hidden sm:flex text-xs">
             <Plus className="size-4" />
-            Add Bookmark
+            Ajouter un Espace
           </Button>
 
           <Separator orientation="vertical" className="h-5 hidden sm:block" />

@@ -9,6 +9,7 @@ import {
     Trash2,
     Edit,
     Copy,
+    MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,7 +35,12 @@ export function BookmarkCard({ bookmark, variant = "grid" }: BookmarkCardProps) 
 
     if (variant === "list") {
         return (
-            <div className="group flex items-center gap-4 bg-card hover:bg-accent/50 border rounded-lg p-3 transition-colors">
+            <div
+                className="group flex items-center gap-4 bg-card hover:bg-accent/50 border rounded-lg p-3 transition-colors cursor-pointer"
+                onClick={() => {
+                    window.dispatchEvent(new CustomEvent("open-bookmark-detail", { detail: bookmark }));
+                }}
+            >
                 <div className="flex-shrink-0 size-10 rounded-md bg-white border flex items-center justify-center overflow-hidden">
                     <img
                         src={bookmark.favicon}
@@ -48,22 +54,18 @@ export function BookmarkCard({ bookmark, variant = "grid" }: BookmarkCardProps) 
 
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                        <h3 className="font-medium truncate">{bookmark.title}</h3>
+                        <h3 className="font-medium truncate group-hover:text-primary transition-colors">{bookmark.title}</h3>
                         {bookmark.isFavorite && (
                             <Star className="size-3 fill-yellow-400 text-yellow-400" />
                         )}
                     </div>
-                    <a
-                        href={bookmark.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-muted-foreground truncate hover:underline block"
-                    >
-                        {bookmark.url}
-                    </a>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <MapPin className="size-3 text-primary/60" />
+                        <span>{bookmark.location || "Antananarivo"}</span>
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                     <Button
                         variant="ghost"
                         size="icon"
@@ -94,11 +96,11 @@ export function BookmarkCard({ bookmark, variant = "grid" }: BookmarkCardProps) 
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={handleCopyUrl}>
                                 <Copy className="mr-2 size-4" />
-                                Copy URL
+                                Copier le lien
                             </DropdownMenuItem>
                             <DropdownMenuItem>
                                 <Edit className="mr-2 size-4" />
-                                Edit
+                                Modifier
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -106,7 +108,7 @@ export function BookmarkCard({ bookmark, variant = "grid" }: BookmarkCardProps) 
                                 onClick={() => trashBookmark(bookmark.id)}
                             >
                                 <Trash2 className="mr-2 size-4" />
-                                Delete
+                                Supprimer
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -116,7 +118,13 @@ export function BookmarkCard({ bookmark, variant = "grid" }: BookmarkCardProps) 
     }
 
     return (
-        <div className="group relative bg-card hover:shadow-sm border rounded-xl overflow-hidden transition-all hover:border-border/80 flex flex-col h-full">
+        <div
+            className="group relative bg-card hover:shadow-md border rounded-xl overflow-hidden transition-all hover:border-primary/50 flex flex-col h-full cursor-pointer"
+            onClick={() => {
+                // Open detail view logic will go here
+                window.dispatchEvent(new CustomEvent("open-bookmark-detail", { detail: bookmark }));
+            }}
+        >
             <div className="p-4 flex-1">
                 <div className="flex items-start justify-between mb-3">
                     <div className="size-10 rounded-md bg-white border flex items-center justify-center overflow-hidden shrink-0">
@@ -129,7 +137,7 @@ export function BookmarkCard({ bookmark, variant = "grid" }: BookmarkCardProps) 
                             }}
                         />
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                         <Button
                             variant="ghost"
                             size="icon"
@@ -154,11 +162,11 @@ export function BookmarkCard({ bookmark, variant = "grid" }: BookmarkCardProps) 
                             <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={handleCopyUrl}>
                                     <Copy className="mr-2 size-4" />
-                                    Copy URL
+                                    Copier le lien
                                 </DropdownMenuItem>
                                 <DropdownMenuItem>
                                     <Edit className="mr-2 size-4" />
-                                    Edit
+                                    Modifier
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
@@ -166,14 +174,14 @@ export function BookmarkCard({ bookmark, variant = "grid" }: BookmarkCardProps) 
                                     onClick={() => trashBookmark(bookmark.id)}
                                 >
                                     <Trash2 className="mr-2 size-4" />
-                                    Delete
+                                    Supprimer
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
                 </div>
 
-                <h3 className="font-semibold text-base mb-1 line-clamp-1">
+                <h3 className="font-semibold text-base mb-1 line-clamp-1 group-hover:text-primary transition-colors">
                     {bookmark.title}
                 </h3>
                 <p className="text-sm text-muted-foreground line-clamp-2 mb-3 h-10">
@@ -181,34 +189,31 @@ export function BookmarkCard({ bookmark, variant = "grid" }: BookmarkCardProps) 
                 </p>
 
                 <div className="flex flex-wrap gap-1.5">
-                    {bookmark.tags.slice(0, 3).map((tag) => (
+                    {bookmark.tags.map((tag) => (
                         <span
                             key={tag}
-                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary text-secondary-foreground"
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/5 text-primary border border-primary/10"
                         >
                             #{tag}
                         </span>
                     ))}
-                    {bookmark.tags.length > 3 && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary text-secondary-foreground">
-                            +{bookmark.tags.length - 3}
-                        </span>
-                    )}
                 </div>
             </div>
 
-            <div className="p-3 border-t bg-muted/20 flex items-center justify-between">
-                <span className="text-xs text-muted-foreground truncate max-w-[150px]">
-                    {new URL(bookmark.url).hostname}
+            <div className="p-3 border-t bg-muted/20 flex items-center justify-between mt-auto">
+                <span className="text-[10px] text-muted-foreground truncate max-w-[150px] flex items-center gap-1">
+                    <MapPin className="size-3" />
+                    {bookmark.location || "Antananarivo"}
                 </span>
                 <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    className="h-7 text-xs gap-1.5"
+                    className="h-7 text-[10px] gap-1.5 font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
+                    onClick={(e) => e.stopPropagation()}
                     asChild
                 >
                     <a href={bookmark.url} target="_blank" rel="noopener noreferrer">
-                        Open
+                        Maps
                         <ExternalLink className="size-3" />
                     </a>
                 </Button>

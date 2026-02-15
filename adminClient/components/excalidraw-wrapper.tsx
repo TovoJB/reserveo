@@ -62,36 +62,96 @@ export function ExcalidrawWrapper({ floorId, viewMode = false, onElementsChange,
     // État pour mémoriser la vue avant le survol
     const [initialView, setInitialView] = useState<{ scrollX: number, scrollY: number, zoom: any } | null>(null);
 
-    /* ---------------- LOAD & SAVE ---------------- */
+    // Utiliser une ref pour onElementsChange pour éviter les boucles infinies
+    const onElementsChangeRef = useRef(onElementsChange);
     useEffect(() => {
-        setIsLoaded(false);
+        onElementsChangeRef.current = onElementsChange;
+    }, [onElementsChange]);
+
+    /* ---------------- LOAD & SAVE ---------------- */
+    const loadFloorData = useCallback(() => {
         const stored = localStorage.getItem(`reserveo-floor-${floorId}`);
         if (stored) {
             const parsed = JSON.parse(stored);
             setInitialData(parsed);
-            if (onElementsChange) {
-                onElementsChange(parsed.elements || []);
+            if (onElementsChangeRef.current) {
+                onElementsChangeRef.current(parsed.elements || []);
             }
         } else {
             setInitialData(null);
+            if (onElementsChangeRef.current) {
+                onElementsChangeRef.current([]);
+            }
         }
-        setIsLoaded(true);
     }, [floorId]);
+
+    useEffect(() => {
+        setIsLoaded(false);
+        loadFloorData();
+        setIsLoaded(true);
+    }, [floorId, loadFloorData]);
+
+    // Écouter les changements du localStorage depuis d'autres onglets uniquement
+    useEffect(() => {
+        // Événement pour les changements dans d'autres onglets
+        const handleStorageChange = (e: StorageEvent) => {
+            if (e.key === `reserveo-floor-${floorId}` && e.newValue) {
+                const parsed = JSON.parse(e.newValue);
+                setInitialData(parsed);
+                if (onElementsChangeRef.current) {
+                    onElementsChangeRef.current(parsed.elements || []);
+                }
+                // Mettre à jour la scène Excalidraw si l'API est disponible
+                if (excalidrawAPI) {
+                    excalidrawAPI.updateScene({
+                        elements: parsed.elements || []
+                    });
+                }
+            }
+        };
+
+        // Événement personnalisé pour mettre à jour SEULEMENT la liste (pas la scène Excalidraw)
+        // Cela évite les boucles infinies en viewMode
+        const handleListUpdate = (e: Event) => {
+            const customEvent = e as CustomEvent;
+            if (customEvent.detail.floorId === floorId && viewMode) {
+                const { elements } = customEvent.detail;
+                if (onElementsChangeRef.current) {
+                    onElementsChangeRef.current(elements);
+                }
+            }
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+        window.addEventListener('reserveo-list-update', handleListUpdate);
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('reserveo-list-update', handleListUpdate);
+        };
+    }, [floorId, excalidrawAPI, viewMode]);
 
     const saveData = useCallback((elements: readonly ExcalidrawElement[], appState: AppState, files: BinaryFiles) => {
         const isVisualEffectActive = elements.some(el => el.opacity && el.opacity < 20);
         if (isVisualEffectActive) return;
 
-        localStorage.setItem(`reserveo-floor-${floorId}`, JSON.stringify({
+        const data = {
             elements,
             appState: { ...appState, collaborators: [] },
             files,
+        };
+
+        localStorage.setItem(`reserveo-floor-${floorId}`, JSON.stringify(data));
+
+        // Émettre un événement pour mettre à jour les listes dans les vues en viewMode
+        window.dispatchEvent(new CustomEvent('reserveo-list-update', {
+            detail: { floorId, elements: [...elements] }
         }));
 
-        if (onElementsChange) {
-            onElementsChange([...elements]);
+        if (onElementsChangeRef.current) {
+            onElementsChangeRef.current([...elements]);
         }
-    }, [floorId, onElementsChange]);
+    }, [floorId]);
 
     const debouncedSave = useCallback(debounce(saveData, 1000), [saveData]);
 
@@ -264,7 +324,9 @@ export function ExcalidrawWrapper({ floorId, viewMode = false, onElementsChange,
                 initialData={initialData || undefined}
                 viewModeEnabled={viewMode}
                 onChange={(elements, appState, files) => {
+                    // En viewMode, ne rien faire (pas de sauvegarde, pas de notification)
                     if (viewMode) return;
+
                     debouncedSave(elements, appState, files);
                     const selectedIds = appState.selectedElementIds;
                     const id = Object.keys(selectedIds || {})[0];

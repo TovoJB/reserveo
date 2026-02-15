@@ -17,6 +17,7 @@ export function MapsPanel({ elements, onSelectElement, selectedElementId }: Maps
   const [searchQuery, setSearchQuery] = React.useState("");
 
   const filteredElements = React.useMemo(() => {
+    console.log("---------------------------------------");
     if (!searchQuery) return elements;
     return elements.filter((el) =>
       el.customData?.name?.toLowerCase().includes(searchQuery.toLowerCase())

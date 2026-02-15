@@ -4,6 +4,7 @@ import { useBookmarksStore } from "@/store/bookmarks-store";
 import { collections, tags } from "@/mock-data/bookmarks";
 import { BookmarkCard } from "./bookmark-card";
 import { StatsCards } from "./stats-cards";
+import { BookmarkDetail } from "./bookmark-detail";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 
@@ -32,6 +33,7 @@ export function BookmarksContent() {
     <div className="flex-1 w-full overflow-auto">
       <div className="p-4 md:p-6 space-y-6">
         <StatsCards />
+        <BookmarkDetail />
 
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">

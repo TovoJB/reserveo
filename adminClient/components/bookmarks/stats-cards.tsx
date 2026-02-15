@@ -1,27 +1,27 @@
 "use client";
 
-import { Bookmark, Star, Tag, FolderOpen } from "lucide-react";
+import { MapPin, Star, Tag, Layout } from "lucide-react";
 import { useBookmarksStore } from "@/store/bookmarks-store";
 import { collections, tags } from "@/mock-data/bookmarks";
 
 const stats = [
   {
-    label: "Total Bookmarks",
-    icon: Bookmark,
+    label: "Total Espaces",
+    icon: MapPin,
     color: "bg-blue-500/10 text-blue-500",
   },
   {
-    label: "Favorites",
+    label: "Coups de Coeur",
     icon: Star,
     color: "bg-amber-500/10 text-amber-500",
   },
   {
-    label: "Collections",
-    icon: FolderOpen,
+    label: "Catégories",
+    icon: Layout,
     color: "bg-violet-500/10 text-violet-500",
   },
   {
-    label: "Tags Used",
+    label: "Options",
     icon: Tag,
     color: "bg-emerald-500/10 text-emerald-500",
   },

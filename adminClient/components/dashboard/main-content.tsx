@@ -24,7 +24,7 @@ export function MainContent() {
 
     if (view === "calendar") {
         return (
-            <div className="flex flex-col h-full overflow-hidden">
+            <div className="flex flex-col flex-1 w-full overflow-hidden">
                 <CalendarControls />
                 <CalendarView />
             </div>
@@ -33,7 +33,7 @@ export function MainContent() {
 
     if (view === "bookmarks") {
         return (
-            <div className="flex flex-col h-full overflow-hidden">
+            <div className="flex flex-col flex-1 w-full overflow-hidden">
                 <BookmarksHeader />
                 <BookmarksContent />
             </div>
@@ -42,7 +42,7 @@ export function MainContent() {
 
     if (view === "clients") {
         return (
-            <div className="flex flex-col h-full overflow-hidden">
+            <div className="flex flex-col flex-1 w-full overflow-hidden">
                 <ClientsTable />
             </div>
         );
@@ -50,7 +50,7 @@ export function MainContent() {
 
     if (view === "tasks") {
         return (
-            <div className="flex flex-col h-full overflow-hidden">
+            <div className="flex flex-col flex-1 w-full overflow-hidden">
                 <TasksTable />
             </div>
         );

@@ -53,17 +53,15 @@ import { collections, tags } from "@/mock-data/bookmarks";
 
 const collectionIcons: Record<string, React.ElementType> = {
   bookmark: Bookmark,
-  palette: Palette,
-  code: Code,
-  wrench: Wrench,
-  "book-open": BookOpen,
+  home: Folder,
+  users: Code,
   sparkles: Sparkles,
 };
 
 const navItems = [
-  { icon: Star, label: "Favorites", href: "/favorites" },
+  { icon: Star, label: "Favoris", href: "/favorites" },
   { icon: Archive, label: "Archive", href: "/archive" },
-  { icon: Trash2, label: "Trash", href: "/trash" },
+  { icon: Trash2, label: "Corbeille", href: "/trash" },
 ];
 
 export function BookmarksSidebar({
@@ -149,7 +147,7 @@ export function BookmarksSidebar({
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Search Bookmarks..."
+            placeholder="Rechercher un espace..."
             className="pl-9 pr-10 h-9 bg-background"
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 bg-muted px-1.5 py-0.5 rounded text-[11px] text-muted-foreground font-medium">
