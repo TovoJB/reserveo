@@ -31,6 +31,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import {
   Search,
   Inbox,
   BarChart3,
@@ -53,6 +70,9 @@ import {
   Settings,
   UserPlus,
   LogOut,
+  MousePointerClick,
+  MoreHorizontal,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -61,42 +81,29 @@ const navItems = [
   // { title: "Search", icon: Search, shortcut: "/" },
   { title: "Gestion Clients", icon: UserPlus },
   { title: "Dashboard", icon: BarChart3, isActive: true, shortcut: "/" },
-  { title: "Gestion Réservations", icon: CheckSquare },
+  { title: "Réservation Admin", icon: MousePointerClick },
+  { title: "Liste des Réservations", icon: CheckSquare },
+  { title: "Plan de Salle", icon: Globe },
   { title: "Modèles d'Espaces", icon: Layers },
   { title: "Calendrier", icon: Calendar },
   { title: "Equipes", icon: Users },
+  { title: "Développement", icon: Code },
+  { title: "Support", icon: Headphones },
   // { title: "Company", icon: Building },
 ];
 
-const workgroups = [
-  {
-    id: "Evenements",
-    name: "Evenements",
-    icon: Globe,
-    children: [
-      {
-        id: "evenement 1",
-        name: "marriage",
-        icon: Folder,
-        children: [
-          { id: "etage 1", name: "etage 1", icon: File },
-          { id: "etage 2", name: "etage 2", icon: File },
-        ],
-      },
-      {
-        id: "evenement 2", name: "parking", icon: Folder,
-        children: [
-          { id: "etage 1", name: "etage 1", icon: File },
-          { id: "etage 2", name: "etage 2", icon: File },
-        ],
-      },
-      { id: "evenement 3", name: "transport", icon: Folder },
-    ],
-  },
-  { id: "marketing", name: "Marketing", icon: Megaphone },
-  { id: "development", name: "Development", icon: Code },
-  { id: "support", name: "Support", icon: Headphones },
-];
+
+import { useWorkgroupStore, WorkgroupItem } from "@/store/workgroup-store";
+
+const iconMap: Record<string, React.ElementType> = {
+  Globe,
+  Folder,
+  File,
+  Megaphone,
+  Code,
+  Headphones,
+  UserPlus,
+};
 
 export function DashboardSidebar({
   ...props
@@ -104,28 +111,101 @@ export function DashboardSidebar({
   const searchParams = useSearchParams();
   const currentViewId = searchParams?.get("id");
 
-  const [expandedItems, setExpandedItems] = React.useState<string[]>([
-    "all-work",
-    "website-copy",
-  ]);
+  const { groups, expandedItems, addItem, deleteItem, toggleItem, setExpandedItems } = useWorkgroupStore();
 
-  const toggleItem = (id: string) => {
-    setExpandedItems((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
+  // Dialog State
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [newItemName, setNewItemName] = React.useState("");
+  const [newItemType, setNewItemType] = React.useState<'folder' | 'file'>('folder');
+  const [selectedParentId, setSelectedParentId] = React.useState<string>("root");
+
+  // Helper to find all potential parent folders (folders that can contain other items)
+  const getAllFolders = (items: WorkgroupItem[], depth = 0): { id: string, name: string, level: number }[] => {
+    let folders: { id: string, name: string, level: number }[] = [];
+    items.forEach(item => {
+      // If it has children or is conceptually a folder, add it
+      if (item.children || item.type === 'folder' || !item.type) {
+        folders.push({ id: item.id, name: item.name, level: depth });
+        if (item.children) {
+          folders = [...folders, ...getAllFolders(item.children, depth + 1)];
+        }
+      }
+    });
+    return folders;
+  };
+
+  const handleAddItem = () => {
+    if (!newItemName.trim()) return;
+
+    const newItem: WorkgroupItem = {
+      id: `${newItemName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
+      name: newItemName,
+      icon: newItemType === 'folder' ? 'Folder' : 'File',
+      type: newItemType,
+      children: newItemType === 'folder' ? [] : undefined,
+      floorId: newItemType === 'file' ? `floor-${Date.now()}` : undefined
+    };
+
+    addItem(newItem, selectedParentId);
+
+    // Reset and close
+    setNewItemName("");
+    setIsDialogOpen(false);
+    // Auto expand the parent if not root
+    if (selectedParentId !== "root" && !expandedItems.includes(selectedParentId)) {
+      toggleItem(selectedParentId);
+    }
+  };
+
+  const handleDeleteItem = (itemId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cet élément ?")) return;
+    deleteItem(itemId);
   };
 
   const renderWorkgroupItem = (
-    item: (typeof workgroups)[0],
+    item: WorkgroupItem,
     level: number = 0
   ) => {
-    const hasChildren = "children" in item && item.children;
+    const hasChildren = item.children && item.children.length > 0;
+    // Also treat empty folders as having potential children if we want to show them as expandable, 
+    // but for now let's rely on 'children' array existence or type 'folder'
+    const isFolder = item.type === 'folder' || (!item.type && item.children);
+
     const isExpanded = expandedItems.includes(item.id);
     const isActive = currentViewId === item.id;
-    const Icon = item.icon;
+    const RawIcon = item.icon ? iconMap[item.icon as string] : File;
+    const Icon = typeof RawIcon === 'function' || typeof RawIcon === 'object' ? RawIcon : File;
     const paddingLeft = level * 12;
 
-    if (hasChildren) {
+    const ItemActions = () => (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 ml-auto opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 data-[state=open]:opacity-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MoreHorizontal className="size-3" />
+            <span className="sr-only">Actions</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteItem(item.id);
+            }}
+          >
+            <Trash2 className="size-4 mr-2" />
+            Supprimer
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+
+    if (isFolder) {
       return (
         <Collapsible
           key={item.id}
@@ -135,16 +215,19 @@ export function DashboardSidebar({
           <SidebarMenuItem>
             <CollapsibleTrigger asChild>
               <SidebarMenuButton
-                className="h-7 text-sm"
+                className="h-7 text-sm group pr-1"
                 style={{ paddingLeft: `${8 + paddingLeft}px` }}
               >
                 <Icon className="size-3.5" />
-                <span className="flex-1">{item.name}</span>
-                {isExpanded ? (
-                  <ChevronDown className="size-3" />
-                ) : (
-                  <ChevronRight className="size-3" />
-                )}
+                <span className="flex-1 truncate">{item.name}</span>
+                <div className="flex items-center gap-1 ml-auto">
+                  <ItemActions />
+                  {isExpanded ? (
+                    <ChevronDown className="size-3 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="size-3 text-muted-foreground" />
+                  )}
+                </div>
               </SidebarMenuButton>
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -152,11 +235,16 @@ export function DashboardSidebar({
                 {item.children?.map((child) => (
                   <SidebarMenuSubItem key={child.id}>
                     {renderWorkgroupItem(
-                      child as (typeof workgroups)[0],
+                      child,
                       level + 1
                     )}
                   </SidebarMenuSubItem>
                 ))}
+                {(!item.children || item.children.length === 0) && (
+                  <div className="text-[10px] text-muted-foreground py-1 px-4 italic" style={{ paddingLeft: `${24 + paddingLeft}px` }}>
+                    Vide
+                  </div>
+                )}
               </SidebarMenuSub>
             </CollapsibleContent>
           </SidebarMenuItem>
@@ -164,18 +252,22 @@ export function DashboardSidebar({
       );
     }
 
+    // File Item
     return (
       <SidebarMenuItem key={item.id}>
         <SidebarMenuButton
           asChild
           isActive={isActive}
-          className="h-7 text-sm"
+          className="h-7 text-sm group pr-1"
           style={{ paddingLeft: `${8 + paddingLeft}px` }}
         >
-          <Link href={`/?view=plan&id=${item.id}`}>
-            <Icon className="size-3.5" />
-            <span>{item.name}</span>
-          </Link>
+          <div className="flex items-center w-full">
+            <Link href={`/?view=plan&id=${item.id}`} className="flex items-center flex-1 min-w-0 gap-2 overflow-hidden">
+              <Icon className="size-3.5 shrink-0" />
+              <span className="truncate">{item.name}</span>
+            </Link>
+            <ItemActions />
+          </div>
         </SidebarMenuButton>
       </SidebarMenuItem>
     );
@@ -227,7 +319,11 @@ export function DashboardSidebar({
                       (item.title === "Calendrier" && searchParams?.get("view") === "calendar") ||
                       (item.title === "Modèles d'Espaces" && searchParams?.get("view") === "bookmarks") ||
                       (item.title === "Gestion Clients" && searchParams?.get("view") === "clients") ||
-                      (item.title === "Gestion Réservations" && searchParams?.get("view") === "tasks")
+                      (item.title === "Liste des Réservations" && searchParams?.get("view") === "tasks") ||
+                      (item.title === "Plan de Salle" && searchParams?.get("view") === "bookings") ||
+                      (item.title === "Réservation Admin" && searchParams?.get("view") === "admin-reservation") ||
+                      (item.title === "Développement" && searchParams?.get("view") === "development") ||
+                      (item.title === "Support" && searchParams?.get("view") === "support")
                     }
                     className="h-7"
                   >
@@ -236,7 +332,11 @@ export function DashboardSidebar({
                         item.title === "Calendrier" ? "/?view=calendar" :
                           item.title === "Modèles d'Espaces" ? "/?view=bookmarks" :
                             item.title === "Gestion Clients" ? "/?view=clients" :
-                              item.title === "Gestion Réservations" ? "/?view=tasks" : "#"
+                              item.title === "Liste des Réservations" ? "/?view=tasks" :
+                                item.title === "Plan de Salle" ? "/?view=bookings" :
+                                  item.title === "Réservation Admin" ? "/?view=admin-reservation" :
+                                    item.title === "Développement" ? "/?view=development" :
+                                      item.title === "Support" ? "/?view=support" : "#"
                     }>
                       <item.icon className="size-3.5" />
                       <span className="text-sm">{item.title}</span>
@@ -262,20 +362,74 @@ export function DashboardSidebar({
               <Button variant="ghost" size="icon" className="size-5">
                 <Search className="size-3" />
               </Button>
-              <Button variant="ghost" size="icon" className="size-5">
-                <Plus className="size-3" />
-              </Button>
+
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="size-5">
+                    <Plus className="size-3" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Créer un nouvel élément</DialogTitle>
+                    <DialogDescription>
+                      Ajoutez un nouveau dossier d'événement ou un plan de salle.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <label htmlFor="type" className="text-sm font-medium">Type</label>
+                      <Select value={newItemType} onValueChange={(v: any) => setNewItemType(v)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choisir un type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="folder">Dossier (Événement/Groupe)</SelectItem>
+                          <SelectItem value="file">Plan Excalidraw</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <label htmlFor="name" className="text-sm font-medium">Nom</label>
+                      <Input
+                        id="name"
+                        value={newItemName}
+                        onChange={(e) => setNewItemName(e.target.value)}
+                        placeholder={newItemType === 'folder' ? "Ex: Mariage VIP" : "Ex: Rez-de-chaussée"}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <label htmlFor="parent" className="text-sm font-medium">Emplacement (Parent)</label>
+                      <Select value={selectedParentId} onValueChange={setSelectedParentId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Racine" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="root">-- Racine (Défaut) --</SelectItem>
+                          {getAllFolders(groups).map((folder) => (
+                            <SelectItem key={folder.id} value={folder.id}>
+                              {Array(folder.level).fill(0).map((_, i) => (
+                                <span key={i} className="opacity-30">&nbsp;&nbsp;--&nbsp;</span>
+                              ))}
+                              {folder.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
+                    <Button onClick={handleAddItem} disabled={!newItemName.trim()}>Créer</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
             </div>
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {workgroups.map((item) => renderWorkgroupItem(item))}
-              <SidebarMenuItem>
-                <SidebarMenuButton className="h-7 text-sm text-muted-foreground">
-                  <Plus className="size-3.5" />
-                  <span>Create Group</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {groups.map((item) => renderWorkgroupItem(item))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -289,25 +443,10 @@ export function DashboardSidebar({
           <div className="text-muted-foreground">
             besoin d aide contacte notre team
           </div>
-          {/* <Link
-            target="_blank"
-            rel="noreferrer"
-            className="absolute inset-0"
-            href="https://square.lndev.me"
-          >
-            <span className="sr-only">Square by lndev-ui</span>
-          </Link> */}
           <Button size="sm" className="w-full" asChild>
-            {/* <Link
-              href="https://square.lndev.me"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              square.lndev.me
-            </Link> */}
-            <div>
+            <Link href="/?view=support">
               contact admin
-            </div>
+            </Link>
           </Button>
         </div>
       </SidebarFooter>

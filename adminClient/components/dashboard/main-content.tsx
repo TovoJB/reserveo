@@ -11,6 +11,10 @@ import { BookmarksHeader } from "../bookmarks/header";
 import { ClientsTable } from "./clients-table";
 import { TasksTable } from "./tasks-table";
 import { BookingView } from "../excalidrawView/booking-view";
+// ... imports
+import { VisualBookingAdmin } from "../admin-booking/visual-booking";
+import { DevelopmentView } from "./development-view";
+import { SupportView } from "./support-view";
 
 export function MainContent() {
     const searchParams = useSearchParams();
@@ -58,6 +62,18 @@ export function MainContent() {
 
     if (view === "bookings") {
         return <BookingView />;
+    }
+
+    if (view === "admin-reservation") {
+        return <VisualBookingAdmin />;
+    }
+
+    if (view === "development") {
+        return <DevelopmentView />;
+    }
+
+    if (view === "support") {
+        return <SupportView />;
     }
 
     return <StatsContent />;

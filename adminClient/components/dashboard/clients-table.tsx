@@ -171,14 +171,15 @@ function RestrictionBadge({
   );
 }
 
+import { useClientStore } from "@/store/client-store";
+
 export function ClientsTable() {
   const {
     searchQuery,
     setSearchQuery,
-    clearFilters,
   } = useDashboardStore();
 
-  const [clients, setClients] = useState<Client[]>(initialClients);
+  const { clients, addClient, updateClient, deleteClient } = useClientStore();
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
@@ -186,6 +187,42 @@ export function ClientsTable() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
   const [qrMode, setQrMode] = useState(false);
+
+  // New Client Form State
+  const [newClientData, setNewClientData] = useState({
+    name: "",
+    email: "",
+    phone: ""
+  });
+
+  const toggleStatus = (clientId: string, newStatus: ClientStatus) => {
+    updateClient(clientId, { status: newStatus });
+  };
+
+  const toggleRestriction = (clientId: string, newRestriction: ClientRestriction) => {
+    updateClient(clientId, { restrictions: newRestriction });
+  };
+
+  const handleAddClient = () => {
+    if (!newClientData.name) return;
+
+    addClient({
+      id: `client-${Date.now()}`,
+      name: newClientData.name,
+      email: newClientData.email || `${newClientData.name.toLowerCase().replace(/\s/g, '.')}@example.mg`,
+      phone: newClientData.phone || "034 XX XXX XX",
+      avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${newClientData.name}`,
+      status: "active",
+      restrictions: "none",
+      bookingCount: 0,
+      lastInteraction: "Just joined",
+      socials: {},
+      history: []
+    });
+
+    setNewClientData({ name: "", email: "", phone: "" });
+    setIsAddClientOpen(false);
+  };
 
   const filteredAndSortedClients = useMemo(() => {
     const result = clients.filter((client) => {
@@ -228,14 +265,6 @@ export function ClientsTable() {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredAndSortedClients.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredAndSortedClients, currentPage, itemsPerPage]);
-
-  const toggleStatus = (clientId: string, newStatus: ClientStatus) => {
-    setClients(prev => prev.map(c => c.id === clientId ? { ...c, status: newStatus } : c));
-  };
-
-  const toggleRestriction = (clientId: string, newRestriction: ClientRestriction) => {
-    setClients(prev => prev.map(c => c.id === clientId ? { ...c, restrictions: newRestriction } : c));
-  };
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -326,15 +355,28 @@ export function ClientsTable() {
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
                       <label className="text-xs font-medium uppercase text-muted-foreground">Nom Complet</label>
-                      <Input placeholder="Ex: Jean Rakoto" />
+                      <Input
+                        placeholder="Ex: Jean Rakoto"
+                        value={newClientData.name}
+                        onChange={(e) => setNewClientData({ ...newClientData, name: e.target.value })}
+                      />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-medium uppercase text-muted-foreground">Email</label>
-                      <Input placeholder="jean@example.mg" type="email" />
+                      <Input
+                        placeholder="jean@example.mg"
+                        type="email"
+                        value={newClientData.email}
+                        onChange={(e) => setNewClientData({ ...newClientData, email: e.target.value })}
+                      />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-medium uppercase text-muted-foreground">Téléphone</label>
-                      <Input placeholder="034 XX XXX XX" />
+                      <Input
+                        placeholder="034 XX XXX XX"
+                        value={newClientData.phone}
+                        onChange={(e) => setNewClientData({ ...newClientData, phone: e.target.value })}
+                      />
                     </div>
                   </div>
                 ) : (
@@ -356,7 +398,7 @@ export function ClientsTable() {
                 )}
 
                 <SheetFooter className="mt-8">
-                  <Button className="w-full" onClick={() => setIsAddClientOpen(false)}>Confirmer l'ajout</Button>
+                  <Button className="w-full" onClick={handleAddClient}>Confirmer l'ajout</Button>
                 </SheetFooter>
               </SheetContent>
             </Sheet>

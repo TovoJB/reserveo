@@ -205,19 +205,60 @@ export function BookmarkCard({ bookmark, variant = "grid" }: BookmarkCardProps) 
                     <MapPin className="size-3" />
                     {bookmark.location || "Antananarivo"}
                 </span>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-[10px] gap-1.5 font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
-                    onClick={(e) => e.stopPropagation()}
-                    asChild
-                >
-                    <a href={bookmark.url} target="_blank" rel="noopener noreferrer">
-                        Maps
-                        <ExternalLink className="size-3" />
-                    </a>
-                </Button>
+                <div className="flex gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-[10px] gap-1.5 font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const name = prompt("Entrez le nom de votre nouvel espace :");
+                            if (name) {
+                                // Fetch the model data
+                                fetch('/data/florplan1.excalidraw')
+                                    .then(res => res.json())
+                                    .then(data => {
+                                        const floorId = `floor-${Date.now()}`;
+                                        localStorage.setItem(`reserveo-floor-${floorId}`, JSON.stringify(data));
+
+                                        // Add to workgroups
+                                        const newItem = {
+                                            id: `item-${Date.now()}`,
+                                            name: name,
+                                            icon: 'File',
+                                            type: 'file' as const,
+                                            floorId: floorId
+                                        };
+
+                                        // Find "Evenements" group or add to root
+                                        useWorkgroupStore.getState().addItem(newItem, "Evenements");
+                                        alert(`Modèle "${name}" créé avec succès !`);
+                                    })
+                                    .catch(err => {
+                                        console.error(err);
+                                        alert("Erreur lors de la récupération du modèle.");
+                                    });
+                            }
+                        }}
+                    >
+                        Utiliser ce modèle
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-[10px] gap-1.5 font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                        asChild
+                    >
+                        <a href={bookmark.url} target="_blank" rel="noopener noreferrer">
+                            Maps
+                            <ExternalLink className="size-3" />
+                        </a>
+                    </Button>
+                </div>
             </div>
         </div>
     );
 }
+
+import { useWorkgroupStore } from "@/store/workgroup-store";

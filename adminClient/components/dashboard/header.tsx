@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useSearchParams } from "next/navigation";
 import {
   BarChart3,
   Sparkles,
@@ -22,17 +23,56 @@ import {
   Mail,
   Link2,
   Users,
+  Code,
+  Headphones,
+  Calendar,
+  Layers,
+  Globe,
+  Settings,
+  MousePointerClick,
+  CheckSquare
 } from "lucide-react";
 import Link from "next/link";
 
 export function DashboardHeader() {
+  const searchParams = useSearchParams();
+  const view = searchParams?.get("view");
+
+  const getHeaderTitle = () => {
+    switch (view) {
+      case "calendar": return "Calendrier";
+      case "bookmarks": return "Modèles d'Espaces";
+      case "clients": return "Gestion Clients";
+      case "tasks": return "Liste des Réservations";
+      case "bookings": return "Plan de Salle";
+      case "admin-reservation": return "Réservation Admin";
+      case "development": return "Développement";
+      case "support": return "Support";
+      default: return "Dashboard";
+    }
+  };
+
+  const getHeaderIcon = () => {
+    switch (view) {
+      case "calendar": return <Calendar className="size-4" />;
+      case "bookmarks": return <Layers className="size-4" />;
+      case "clients": return <UserPlus className="size-4" />;
+      case "tasks": return <CheckSquare className="size-4" />;
+      case "bookings": return <Globe className="size-4" />;
+      case "admin-reservation": return <MousePointerClick className="size-4" />;
+      case "development": return <Code className="size-4" />;
+      case "support": return <Headphones className="size-4" />;
+      default: return <BarChart3 className="size-4" />;
+    }
+  };
+
   return (
     <header className="flex items-center justify-between gap-4 px-4 sm:px-6 py-3 border-b bg-card sticky top-0 z-10 w-full">
       <div className="flex items-center gap-3">
         <SidebarTrigger className="-ml-2" />
         <div className="hidden sm:flex items-center gap-2 text-muted-foreground">
-          <BarChart3 className="size-4" />
-          <span className="text-sm font-medium">Dashboard</span>
+          {getHeaderIcon()}
+          <span className="text-sm font-medium">{getHeaderTitle()}</span>
         </div>
       </div>
 

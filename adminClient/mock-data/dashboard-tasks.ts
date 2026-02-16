@@ -753,7 +753,6 @@ export const workgroups = [
       { id: "assets-library", name: "Assets Library", icon: "folder" },
     ],
   },
-  { id: "marketing", name: "Marketing", icon: "megaphone" },
   { id: "development", name: "Development", icon: "code" },
   { id: "support", name: "Support", icon: "headphones" },
 ];

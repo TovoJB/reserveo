@@ -58,9 +58,14 @@ export function ExcalidrawWrapper({ floorId, viewMode = false, onElementsChange,
     const [isLoaded, setIsLoaded] = useState(false);
     const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
     const [selectedElement, setSelectedElement] = useState<ExcalidrawElement | null>(null);
+    const [searchTerm, setSearchTerm] = useState("");
 
     // État pour mémoriser la vue avant le survol
     const [initialView, setInitialView] = useState<{ scrollX: number, scrollY: number, zoom: any } | null>(null);
+
+    useEffect(() => {
+        setSearchTerm("");
+    }, [selectedElement?.id]);
 
     // Utiliser une ref pour onElementsChange pour éviter les boucles infinies
     const onElementsChangeRef = useRef(onElementsChange);
@@ -69,15 +74,34 @@ export function ExcalidrawWrapper({ floorId, viewMode = false, onElementsChange,
     }, [onElementsChange]);
 
     /* ---------------- LOAD & SAVE ---------------- */
-    const loadFloorData = useCallback(() => {
+    const loadFloorData = useCallback(async () => {
         const stored = localStorage.getItem(`reserveo-floor-${floorId}`);
+        let hasData = false;
+
         if (stored) {
             const parsed = JSON.parse(stored);
-            setInitialData(parsed);
-            if (onElementsChangeRef.current) {
-                onElementsChangeRef.current(parsed.elements || []);
+            if (parsed.elements && parsed.elements.length > 0) {
+                setInitialData(parsed);
+                if (onElementsChangeRef.current) {
+                    onElementsChangeRef.current(parsed.elements);
+                }
+                hasData = true;
             }
-        } else {
+        }
+
+        if (!hasData && floorId === "default-plan") {
+            try {
+                const res = await fetch('/data/florplan1.excalidraw');
+                const data = await res.json();
+                setInitialData(data);
+                if (onElementsChangeRef.current) {
+                    onElementsChangeRef.current(data.elements || []);
+                }
+                localStorage.setItem(`reserveo-floor-${floorId}`, JSON.stringify(data));
+            } catch (err) {
+                console.error("Failed to fetch default plan:", err);
+            }
+        } else if (!hasData) {
             setInitialData(null);
             if (onElementsChangeRef.current) {
                 onElementsChangeRef.current([]);
@@ -86,9 +110,12 @@ export function ExcalidrawWrapper({ floorId, viewMode = false, onElementsChange,
     }, [floorId]);
 
     useEffect(() => {
-        setIsLoaded(false);
-        loadFloorData();
-        setIsLoaded(true);
+        const init = async () => {
+            setIsLoaded(false);
+            await loadFloorData();
+            setIsLoaded(true);
+        };
+        init();
     }, [floorId, loadFloorData]);
 
     // Écouter les changements du localStorage depuis d'autres onglets uniquement
@@ -130,6 +157,23 @@ export function ExcalidrawWrapper({ floorId, viewMode = false, onElementsChange,
             window.removeEventListener('reserveo-list-update', handleListUpdate);
         };
     }, [floorId, excalidrawAPI, viewMode]);
+
+    useEffect(() => {
+        // Auto-fit zoom when elements are loaded and API is ready
+        if (excalidrawAPI && initialData?.elements && initialData.elements.length > 0) {
+            const timer = setTimeout(() => {
+                // We pass the entire elements array to ensure it zooms to fit EVERYTHING
+                const visibleElements = initialData.elements.filter((el: any) => !el.isDeleted);
+                if (visibleElements.length > 0) {
+                    excalidrawAPI.scrollToContent(visibleElements, {
+                        padding: 50,
+                        animate: true,
+                    });
+                }
+            }, 800); // Slightly longer delay to ensure full scene initialization
+            return () => clearTimeout(timer);
+        }
+    }, [excalidrawAPI, floorId, initialData]);
 
     const saveData = useCallback((elements: readonly ExcalidrawElement[], appState: AppState, files: BinaryFiles) => {
         const isVisualEffectActive = elements.some(el => el.opacity && el.opacity < 20);
@@ -317,7 +361,7 @@ export function ExcalidrawWrapper({ floorId, viewMode = false, onElementsChange,
     if (!isLoaded) return null;
 
     return (
-        <div className="fixed inset-0 bg-white">
+        <div className="absolute inset-0 bg-white">
             <Excalidraw
                 key={floorId}
                 excalidrawAPI={(api) => setExcalidrawAPI(api)}
@@ -449,13 +493,24 @@ export function ExcalidrawWrapper({ floorId, viewMode = false, onElementsChange,
                                 </div>
 
                                 <label className="text-[10px] font-bold text-gray-400 uppercase block mb-2">Lier un nouvel élément</label>
+                                <div className="mb-2">
+                                    <input
+                                        type="text"
+                                        placeholder="🔍 Rechercher..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full px-2 py-1 text-xs border rounded bg-white focus:ring-1 focus:ring-blue-500 outline-none placeholder:text-gray-300"
+                                    />
+                                </div>
                                 <div className="max-h-32 overflow-y-auto border rounded bg-gray-50 text-xs divide-y border-gray-200">
                                     {allNamedElements
-                                        .filter((el: any) =>
-                                            el.id !== selectedElement.id &&
-                                            !(selectedElement.customData?.children || []).includes(el.id) &&
-                                            !isDescendant(el.id, selectedElement.id) // Prevent cycles: check if selectedElement is already a descendant of candidate el
-                                        )
+                                        .filter((el: any) => {
+                                            const matchesSearch = !searchTerm || (el.customData?.name || "").toLowerCase().includes(searchTerm.toLowerCase());
+                                            return matchesSearch &&
+                                                el.id !== selectedElement.id &&
+                                                !(selectedElement.customData?.children || []).includes(el.id) &&
+                                                !isDescendant(el.id, selectedElement.id);
+                                        })
                                         .map((el: any) => (
                                             <div
                                                 key={el.id}
