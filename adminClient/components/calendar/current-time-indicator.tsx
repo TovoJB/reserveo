@@ -8,6 +8,7 @@ interface CurrentTimeIndicatorProps {
   today: Date;
   isTodayInWeek: boolean;
   currentTime: Date;
+  startRangeHour: number;
 }
 
 export function CurrentTimeIndicator({
@@ -15,12 +16,13 @@ export function CurrentTimeIndicator({
   today,
   isTodayInWeek,
   currentTime,
+  startRangeHour,
 }: CurrentTimeIndicatorProps) {
   if (!isTodayInWeek || !isSameDay(day, today)) {
     return null;
   }
 
-  const currentTimePosition = getCurrentTimePosition(currentTime);
+  const currentTimePosition = getCurrentTimePosition(currentTime, startRangeHour);
 
   return (
     <div

@@ -3,6 +3,10 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import "@excalidraw/excalidraw/index.css";
+import { useTypesStore, getPricingPolicyLabel } from "@/store/types-store";
+import { cn } from "@/lib/utils";
+import { Box } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Types simplifiés
 type ExcalidrawElement = any;
@@ -31,26 +35,6 @@ function debounce<T extends (...args: any[]) => void>(fn: T, delay: number) {
     };
 }
 
-const PRICE_UNITS = [
-    { value: "minute", label: "Minute" },
-    { value: "hour", label: "Heure" },
-    { value: "day", label: "Jour" },
-    { value: "half_day", label: "Demi-journée" },
-    { value: "full_day", label: "Journée" },
-    { value: "week", label: "Semaine" },
-    { value: "month", label: "Mois" },
-    { value: "year", label: "Année" },
-];
-
-const DAYS = [
-    { id: 1, label: "Lun" },
-    { id: 2, label: "Mar" },
-    { id: 3, label: "Mer" },
-    { id: 4, label: "Jeu" },
-    { id: 5, label: "Ven" },
-    { id: 6, label: "Sam" },
-    { id: 0, label: "Dim" },
-];
 
 export function ExcalidrawWrapper({ floorId, viewMode = false, onElementsChange, focusedElementId }: ExcalidrawWrapperProps) {
 
@@ -59,6 +43,8 @@ export function ExcalidrawWrapper({ floorId, viewMode = false, onElementsChange,
     const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
     const [selectedElement, setSelectedElement] = useState<ExcalidrawElement | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
+
+    const { emplacementTypes, pricingPolicies, openingHours } = useTypesStore();
 
     // État pour mémoriser la vue avant le survol
     const [initialView, setInitialView] = useState<{ scrollX: number, scrollY: number, zoom: any } | null>(null);
@@ -158,22 +144,6 @@ export function ExcalidrawWrapper({ floorId, viewMode = false, onElementsChange,
         };
     }, [floorId, excalidrawAPI, viewMode]);
 
-    useEffect(() => {
-        // Auto-fit zoom when elements are loaded and API is ready
-        if (excalidrawAPI && initialData?.elements && initialData.elements.length > 0) {
-            const timer = setTimeout(() => {
-                // We pass the entire elements array to ensure it zooms to fit EVERYTHING
-                const visibleElements = initialData.elements.filter((el: any) => !el.isDeleted);
-                if (visibleElements.length > 0) {
-                    excalidrawAPI.scrollToContent(visibleElements, {
-                        padding: 50,
-                        animate: true,
-                    });
-                }
-            }, 800); // Slightly longer delay to ensure full scene initialization
-            return () => clearTimeout(timer);
-        }
-    }, [excalidrawAPI, floorId, initialData]);
 
     const saveData = useCallback((elements: readonly ExcalidrawElement[], appState: AppState, files: BinaryFiles) => {
         const isVisualEffectActive = elements.some(el => el.opacity && el.opacity < 20);
@@ -221,6 +191,25 @@ export function ExcalidrawWrapper({ floorId, viewMode = false, onElementsChange,
             lastFocusedIdRef.current = null;
         }
     }, [focusedElementId, excalidrawAPI]);
+
+    /**
+     * Forcer le zoom initial pour tout voir au chargement d'un étage
+     * Cela règle le problème du zoom "trop grand" (trop près) au départ.
+     */
+    useEffect(() => {
+        if (excalidrawAPI && isLoaded && initialData) {
+            const timer = setTimeout(() => {
+                const elements = excalidrawAPI.getSceneElements();
+                if (elements.length > 0) {
+                    excalidrawAPI.scrollToContent(elements, {
+                        padding: 150, // On augmente le padding pour dézoomer davantage et tout voir
+                        animate: true,
+                    });
+                }
+            }, 600); // Un léger délai pour laisser Excalidraw charger les données dans la scène
+            return () => clearTimeout(timer);
+        }
+    }, [excalidrawAPI, floorId, isLoaded, initialData]);
 
 
     const handleRemoveBackground = async () => {
@@ -361,7 +350,8 @@ export function ExcalidrawWrapper({ floorId, viewMode = false, onElementsChange,
     if (!isLoaded) return null;
 
     return (
-        <div className="absolute inset-0 bg-white">
+        <div className="fixed inset-0 bg-white">
+
             <Excalidraw
                 key={floorId}
                 excalidrawAPI={(api) => setExcalidrawAPI(api)}
@@ -400,70 +390,159 @@ export function ExcalidrawWrapper({ floorId, viewMode = false, onElementsChange,
                             />
                         </div>
 
-                        {selectedElement.type === "image" && (
-                            <div>
-                                <button
-                                    onClick={handleRemoveBackground}
-                                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-purple-50 text-purple-600 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors text-xs font-semibold"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M7 21a4 4 0 0 1-4-4V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v12a4 4 0 0 1-4 4zm0 0h12a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2h-2.343M11 7.343l1.657-1.343 1.657 1.343" />
-                                    </svg>
-                                    Retirer le fond (IA)
-                                </button>
+                        <div className="pt-2">
+                            <div className="flex items-center justify-between p-3 rounded-xl border bg-slate-50/50 hover:bg-slate-50 transition-all group">
+                                <div className="flex items-center gap-3">
+                                    <div className={cn(
+                                        "size-8 rounded-lg flex items-center justify-center transition-colors",
+                                        (selectedElement.customData?.isReservable !== false)
+                                            ? "bg-emerald-100 text-emerald-600"
+                                            : "bg-slate-200 text-slate-500"
+                                    )}>
+                                        <Box className="size-4" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold uppercase tracking-tight">Objet Réservable</p>
+                                        <p className="text-[9px] text-muted-foreground italic">
+                                            {(selectedElement.customData?.isReservable !== false) ? "Actif pour réservation" : "Objet de décor"}
+                                        </p>
+                                    </div>
+                                </div>
+                                <Checkbox
+                                    id="isReservable"
+                                    checked={selectedElement.customData?.isReservable !== false}
+                                    onCheckedChange={(checked) => updateCustomData("isReservable", !!checked)}
+                                    className="data-[state=checked]:bg-emerald-500 border-emerald-200"
+                                />
                             </div>
-                        )}
+                        </div>
 
-                        <div className={`space-y-4 transition-all duration-200 ${!selectedElement.customData?.name?.trim() ? "opacity-30 pointer-events-none filter grayscale" : ""}`}>
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="text-[10px] font-bold text-blue-600 uppercase block mb-1">Prix (Ar)</label>
+                        <div className={`space-y-4 transition-all duration-300 ${(!selectedElement.customData?.name?.trim() || selectedElement.customData?.isReservable === false) ? "opacity-30 pointer-events-none filter grayscale overflow-hidden" : ""}`}>
+                            <div>
+                                <label className="text-[10px] font-bold text-blue-600 uppercase block mb-1">Type d'emplacement</label>
+                                <div className="space-y-2">
                                     <input
                                         className="w-full px-2 py-1.5 border rounded bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                                        type="number"
-                                        value={selectedElement.customData?.price || ""}
-                                        onChange={(e) => updateCustomData("price", e.target.value)}
+                                        list="emplacement-types"
+                                        value={selectedElement.customData?.type || ""}
+                                        onChange={(e) => updateCustomData("type", e.target.value)}
+                                        placeholder="Chaise, Table, etc..."
                                     />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-blue-600 uppercase block mb-1">Unité</label>
-                                    <select
-                                        className="w-full px-2 py-1.5 border rounded bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                                        value={selectedElement.customData?.priceUnit || "hour"}
-                                        onChange={(e) => updateCustomData("priceUnit", e.target.value)}
-                                    >
-                                        {PRICE_UNITS.map((unit) => (
-                                            <option key={unit.value} value={unit.value}>
-                                                {unit.label}
-                                            </option>
+                                    <datalist id="emplacement-types">
+                                        {emplacementTypes.map((t) => (
+                                            <option key={t.id} value={t.name} />
                                         ))}
-                                    </select>
+                                    </datalist>
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                        {emplacementTypes.slice(0, 5).map((t) => (
+                                            <button
+                                                key={t.id}
+                                                onClick={() => updateCustomData("type", t.name)}
+                                                className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${selectedElement.customData?.type === t.name
+                                                    ? "bg-blue-600 border-blue-600 text-white"
+                                                    : "bg-white border-gray-200 text-gray-500 hover:border-blue-400"
+                                                    }`}
+                                            >
+                                                {t.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="space-y-3">
+                                <div className="p-2 border border-blue-100 bg-blue-50/30 rounded-lg">
+                                    <label className="text-[10px] font-bold text-blue-600 uppercase block mb-3">Tarification (Options Actives)</label>
+                                    <div className="space-y-2">
+                                        {pricingPolicies.map((policy) => {
+                                            const prices = selectedElement.customData?.prices || {};
+                                            // Handle legacy data visually
+                                            const legacyPrice = (selectedElement.customData?.priceUnit === policy || (!selectedElement.customData?.priceUnit && policy === "hour")) ? selectedElement.customData?.price : "";
+                                            const val = prices[policy] !== undefined ? prices[policy] : legacyPrice;
+
+                                            if (policy === "free") return null;
+
+                                            return (
+                                                <div key={policy} className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-semibold w-24 truncate text-slate-600" title={getPricingPolicyLabel(policy)}>
+                                                        {getPricingPolicyLabel(policy)}
+                                                    </span>
+                                                    <div className="relative flex-1">
+                                                        <input
+                                                            className="w-full pl-2 pr-6 py-1.5 border border-slate-200 rounded-md bg-white focus:ring-2 focus:ring-blue-500 outline-none text-xs transition-shadow"
+                                                            type="number"
+                                                            placeholder="Non défini"
+                                                            value={val || ""}
+                                                            onChange={(e) => {
+                                                                const newPrices = { ...(selectedElement.customData?.prices || {}) };
+                                                                if (e.target.value === "") {
+                                                                    delete newPrices[policy];
+                                                                } else {
+                                                                    newPrices[policy] = e.target.value;
+                                                                }
+                                                                updateCustomData("prices", newPrices);
+
+                                                                // Sync legacy field for backwards compatibility if needed
+                                                                if (Object.keys(newPrices).length === 1 || policy === selectedElement.customData?.priceUnit) {
+                                                                    updateCustomData("price", e.target.value);
+                                                                    updateCustomData("priceUnit", policy);
+                                                                }
+                                                            }}
+                                                        />
+                                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400">Ar</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    {(Object.values(selectedElement.customData?.prices || {}).some(val => val !== undefined && val !== "") || selectedElement.customData?.price) && (
+                                        <div className="mt-3 pt-2 border-t border-blue-100 flex flex-col gap-1">
+                                            <span className="text-[9px] font-bold text-blue-700 mb-1">Aperçu :</span>
+                                            {pricingPolicies.filter(p => p !== "free").map(p => {
+                                                const pValue = selectedElement.customData?.prices?.[p] || ((selectedElement.customData?.priceUnit === p || (!selectedElement.customData?.priceUnit && p === "hour")) ? selectedElement.customData?.price : undefined);
+                                                if (!pValue) return null;
+                                                return (
+                                                    <div key={p} className="flex justify-between items-center text-[10px] text-blue-800">
+                                                        <span>{getPricingPolicyLabel(p)} :</span>
+                                                        <span className="font-mono font-bold bg-white px-1 rounded">{pValue} Ar</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-bold text-blue-600 uppercase block mb-1">Jours Ouvrables</label>
                                     <div className="flex flex-wrap gap-1">
-                                        {DAYS.map((day) => {
-                                            const isSelected = (selectedElement.customData?.workingDays || []).includes(day.id);
+                                        {Object.entries(openingHours).map(([day, config]) => {
+                                            const isSelected = (selectedElement.customData?.workingDays || []).includes(day);
                                             return (
                                                 <button
-                                                    key={day.id}
+                                                    key={day}
                                                     onClick={() => {
                                                         const currentDays = selectedElement.customData?.workingDays || [];
                                                         const newDays = isSelected
-                                                            ? currentDays.filter((d: number) => d !== day.id)
-                                                            : [...currentDays, day.id];
+                                                            ? currentDays.filter((d: string) => d !== day)
+                                                            : [...currentDays, day];
                                                         updateCustomData("workingDays", newDays);
                                                     }}
-                                                    className={`px-2 py-1 text-xs rounded border transition-colors ${isSelected
-                                                        ? "bg-blue-600 text-white border-blue-600"
-                                                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                                                        }`}
+                                                    className={cn(
+                                                        "px-2 py-1 text-[10px] rounded border transition-colors",
+                                                        isSelected
+                                                            ? "bg-blue-600 text-white border-blue-600"
+                                                            : !config.isOpen
+                                                                ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                                                                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                                                    )}
+                                                    disabled={!config.isOpen}
                                                 >
-                                                    {day.label}
+                                                    {day.slice(0, 3)}
                                                 </button>
                                             );
                                         })}
                                     </div>
+                                    <p className="text-[9px] text-muted-foreground mt-1 italic">
+                                        Seules les jounées cochées dans Paramètres sont activables.
+                                    </p>
                                 </div>
                             </div>
 

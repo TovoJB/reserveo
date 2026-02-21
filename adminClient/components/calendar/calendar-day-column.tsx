@@ -20,6 +20,8 @@ interface CalendarDayColumnProps {
   onScroll: (index: number) => (e: React.UIEvent<HTMLDivElement>) => void;
   scrollRef: (el: HTMLDivElement | null) => void;
   onEventClick: (event: Event) => void;
+  hours: string[];
+  startRangeHour: number;
 }
 
 export function CalendarDayColumn({
@@ -32,6 +34,8 @@ export function CalendarDayColumn({
   onScroll,
   scrollRef,
   onEventClick,
+  hours,
+  startRangeHour,
 }: CalendarDayColumnProps) {
   return (
     <div
@@ -39,7 +43,7 @@ export function CalendarDayColumn({
       onScroll={onScroll(dayIndex)}
       className="flex-1 border-r border-border last:border-r-0 relative min-w-44 overflow-y-auto"
     >
-      {HOURS_24.map((hour) => (
+      {hours.map((hour) => (
         <div
           key={hour}
           className="border-b border-border"
@@ -52,10 +56,11 @@ export function CalendarDayColumn({
         today={today}
         isTodayInWeek={isTodayInWeek}
         currentTime={currentTime}
+        startRangeHour={startRangeHour}
       />
 
       {events.map((event) => {
-        const top = getEventTop(event.startTime);
+        const top = getEventTop(event.startTime, startRangeHour);
         const height = getEventHeight(event.startTime, event.endTime);
 
         return (

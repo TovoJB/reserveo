@@ -28,6 +28,7 @@ interface BookmarksState {
   trashBookmark: (bookmarkId: string) => void;
   restoreFromTrash: (bookmarkId: string) => void;
   permanentlyDelete: (bookmarkId: string) => void;
+  addBookmark: (bookmark: Omit<Bookmark, "id" | "createdAt" | "isFavorite">) => void;
   getFilteredBookmarks: () => Bookmark[];
   getFavoriteBookmarks: () => Bookmark[];
   getArchivedBookmarks: () => Bookmark[];
@@ -116,6 +117,20 @@ export const useBookmarksStore = create<BookmarksState>((set, get) => ({
   permanentlyDelete: (bookmarkId) =>
     set((state) => ({
       trashedBookmarks: state.trashedBookmarks.filter((b) => b.id !== bookmarkId),
+    })),
+
+  addBookmark: (bookmark) =>
+    set((state) => ({
+      bookmarks: [
+        {
+          ...bookmark,
+          id: Math.random().toString(36).substring(7),
+          createdAt: new Date().toISOString().split("T")[0],
+          isFavorite: false,
+          favicon: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(bookmark.title)}`,
+        },
+        ...state.bookmarks,
+      ],
     })),
 
   getFilteredBookmarks: () => {

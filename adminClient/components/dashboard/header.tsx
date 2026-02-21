@@ -23,6 +23,7 @@ import {
   Mail,
   Link2,
   Users,
+  Building,
   Code,
   Headphones,
   Calendar,
@@ -30,7 +31,8 @@ import {
   Globe,
   Settings,
   MousePointerClick,
-  CheckSquare
+  CheckSquare,
+  Database,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -48,6 +50,9 @@ export function DashboardHeader() {
       case "admin-reservation": return "Réservation Admin";
       case "development": return "Développement";
       case "support": return "Support";
+      case "profile": return "Profil";
+      case "teams": return "Equipes";
+      case "clients-import": return "Sync Google Forms";
       default: return "Dashboard";
     }
   };
@@ -62,6 +67,9 @@ export function DashboardHeader() {
       case "admin-reservation": return <MousePointerClick className="size-4" />;
       case "development": return <Code className="size-4" />;
       case "support": return <Headphones className="size-4" />;
+      case "profile": return <Building className="size-4" />;
+      case "teams": return <Users className="size-4" />;
+      case "clients-import": return <Database className="size-4" />;
       default: return <BarChart3 className="size-4" />;
     }
   };

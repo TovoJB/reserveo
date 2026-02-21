@@ -64,6 +64,11 @@ import {
   Plus,
   Info,
   Calendar,
+  Copy,
+  ClipboardPaste,
+  Database,
+  Table as TableIcon,
+  Map as MapIcon,
 } from "lucide-react";
 import {
   Select,
@@ -73,8 +78,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { clients as initialClients, Client, ClientStatus, ClientRestriction } from "@/mock-data/dashboard";
+import { clients as initialClients, Client, ClientStatus, ClientRestriction, RestrictionRule, RestrictionOperator, ClientRestrictionDetails } from "@/mock-data/dashboard";
 import { useDashboardStore } from "@/store/dashboard-store";
+import { useTypesStore } from "@/store/types-store";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  useClients,
+  useUpdateClientStatus,
+  useUpdateClientRestrictions,
+  useDeleteClient,
+  type BackendClient,
+} from "@/hooks/use-clients";
+import { RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { useRouter } from "next/navigation";
+
 
 type SortField = "name" | "email" | "lastInteraction" | "status" | "bookingCount";
 type SortOrder = "asc" | "desc";
@@ -134,40 +155,194 @@ function StatusBadge({
   );
 }
 
+import { VisualRestrictionSelector } from "./visual-restriction-selector";
+
 function RestrictionBadge({
   restriction,
+  clientId,
   onToggle
 }: {
   restriction: ClientRestriction;
+  clientId: string;
   onToggle: (newRestriction: ClientRestriction) => void
 }) {
-  const configs: Record<ClientRestriction, { label: string, color: string }> = {
-    none: { label: "Aucune", color: "bg-muted text-muted-foreground" },
-    "tables-only": { label: "Tables uniquement", color: "bg-amber-500/10 text-amber-500 border-amber-500/40" },
-    "chairs-only": { label: "Chaises uniquement", color: "bg-orange-500/10 text-orange-500 border-orange-500/40" },
-    all: { label: "Tout restreindre", color: "bg-red-500/10 text-red-500 border-red-500/40" },
+  const { emplacementTypes } = useTypesStore();
+  const [isVisualSelectorOpen, setIsVisualSelectorOpen] = useState(false);
+
+  const [newRule, setNewRule] = useState<RestrictionRule>({
+    type: emplacementTypes[0]?.name || "chaise",
+    operator: "max",
+    value: 1
+  });
+
+  const getDetails = (r: ClientRestriction): ClientRestrictionDetails => {
+    if (r === "none" || r === "all") return { rules: [], forbiddenPlaces: [] };
+    if (Array.isArray(r)) return { rules: r, forbiddenPlaces: [] };
+    return {
+      rules: r?.rules ?? [],
+      forbiddenPlaces: r?.forbiddenPlaces ?? []
+    };
   };
 
-  const config = configs[restriction];
+  const details = getDetails(restriction);
+
+  const addRule = () => {
+    const currentRules = details.rules;
+    const existingIndex = currentRules.findIndex((r: RestrictionRule) => r.type === newRule.type && r.operator === newRule.operator);
+
+    let updatedRules = [...currentRules];
+    if (existingIndex > -1) {
+      updatedRules[existingIndex] = newRule;
+    } else {
+      updatedRules.push(newRule);
+    }
+
+    onToggle({ ...details, rules: updatedRules });
+  };
+
+  const removeRule = (index: number) => {
+    const updatedRules = details.rules.filter((_: RestrictionRule, i: number) => i !== index);
+    onToggle({ ...details, rules: updatedRules });
+  };
+
+  const toggleForbiddenPlace = (elementId: string) => {
+    const current = details.forbiddenPlaces;
+    const updated = current.includes(elementId)
+      ? current.filter((id: string) => id !== elementId)
+      : [...current, elementId];
+
+    onToggle({ ...details, forbiddenPlaces: updated });
+  };
+
+  const renderSummary = () => {
+    if (restriction === "none") return "Aucune";
+    if (restriction === "all") return "Tout Bloqué";
+
+    const ruleCount = details.rules.length;
+    const placeCount = details.forbiddenPlaces.length;
+
+    if (ruleCount === 0 && placeCount === 0) return "Aucune";
+    if (ruleCount > 0 && placeCount > 0) return `${ruleCount} R / ${placeCount} P`;
+    if (ruleCount > 0) return `${ruleCount} règle(s)`;
+    return `${placeCount} place(s) interdite(s)`;
+  };
+
+  const color = restriction === "none" ? "bg-muted text-muted-foreground" :
+    restriction === "all" ? "bg-red-500/10 text-red-500 border-red-500/40" :
+      "bg-amber-500/10 text-amber-500 border-amber-500/40";
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <div
-          className={`flex items-center px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:opacity-80 transition-all ${config.color}`}
-        >
-          {config.label}
-        </div>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        <DropdownMenuLabel>Restrictions</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => onToggle("none")}>Pas de restriction</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onToggle("tables-only")}>Tables seulement</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onToggle("chairs-only")}>Chaises seulement</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onToggle("all")}>Tout restreindre</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <Popover>
+        <PopoverTrigger asChild>
+          <div
+            className={`flex items-center px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:opacity-80 transition-all ${color}`}
+          >
+            {renderSummary()}
+          </div>
+        </PopoverTrigger>
+        <PopoverContent className="w-80 p-4">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-sm">Gestion des Restrictions</h4>
+              <div className="flex gap-1">
+                <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => onToggle("none")}>Reset</Button>
+                <Button variant="destructive" size="sm" className="h-7 text-[10px]" onClick={() => onToggle("all")}>Tout Bloquer</Button>
+              </div>
+            </div>
+
+            <div className="p-3 bg-primary/5 rounded-xl border border-primary/10 space-y-2">
+              <p className="text-[10px] font-bold text-primary uppercase flex items-center justify-between">
+                Sélecteur de Places
+                {details.forbiddenPlaces.length > 0 && (
+                  <Badge variant="secondary" className="bg-primary/20 text-primary border-none pointer-events-none text-[9px]">
+                    {details.forbiddenPlaces.length} Sélectionnée(s)
+                  </Badge>
+                )}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs font-semibold gap-2 border-primary/30 hover:bg-primary/5"
+                onClick={() => {
+                  window.location.href = `/?view=admin-reservation&mode=restrict&clientId=${clientId}`;
+                }}
+              >
+                <MapIcon className="size-3.5" />
+                Choisir sur le Plan
+              </Button>
+            </div>
+
+            {details.rules.length > 0 && (
+              <div className="space-y-2 py-2 border-y">
+                {details.rules.map((rule: RestrictionRule, idx: number) => (
+                  <div key={idx} className="flex items-center justify-between bg-muted/30 p-2 rounded-lg text-xs">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-primary uppercase text-[9px]">{rule.type}</span>
+                      <span className="text-sm font-medium">
+                        {rule.operator === "max" ? "Maximum" : rule.operator === "min" ? "Minimum" : "Exactement"} : {rule.value}
+                      </span>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-50 hover:opacity-100" onClick={() => removeRule(idx)}>
+                      <X className="size-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="space-y-3 bg-muted/50 p-3 rounded-xl border border-dashed border-primary/20">
+              <p className="text-[10px] font-bold text-primary uppercase">Quantité limite par Type</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted-foreground">Objet</label>
+                  <Select value={newRule.type} onValueChange={(v) => setNewRule({ ...newRule, type: v })}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {emplacementTypes.map(t => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted-foreground">Condition</label>
+                  <Select value={newRule.operator} onValueChange={(v: any) => setNewRule({ ...newRule, operator: v })}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="max">Maximum (≤)</SelectItem>
+                      <SelectItem value="min">Minimum (≥)</SelectItem>
+                      <SelectItem value="equal">Égal (=)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1 space-y-1">
+                  <label className="text-[10px] text-muted-foreground">Qté</label>
+                  <Input
+                    type="number"
+                    className="h-8 text-xs"
+                    value={newRule.value}
+                    onChange={(e) => setNewRule({ ...newRule, value: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button size="sm" className="h-8 text-[11px] px-4 font-bold" onClick={addRule}>
+                    <Plus className="size-3.5 mr-1" /> AJOUTER
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <VisualRestrictionSelector
+        open={isVisualSelectorOpen}
+        onOpenChange={setIsVisualSelectorOpen}
+        forbiddenPlaces={details.forbiddenPlaces}
+        onTogglePlace={toggleForbiddenPlace}
+      />
+    </>
   );
 }
 
@@ -179,7 +354,53 @@ export function ClientsTable() {
     setSearchQuery,
   } = useDashboardStore();
 
-  const { clients, addClient, updateClient, deleteClient } = useClientStore();
+  // ── Backend data ──────────────────────────────────────────────
+  const { data: backendClients, isLoading, isError, refetch } = useClients();
+  const updateStatusMutation = useUpdateClientStatus();
+  const updateRestrictionsMutation = useUpdateClientRestrictions();
+  const deleteClientMutation = useDeleteClient();
+
+  // Map backend status → local status
+  const mapBackendStatus = (s: BackendClient["status"]): ClientStatus => {
+    if (s === "BANNED") return "banned";
+    if (s === "SUSPENDED") return "banned";
+    return "active";
+  };
+
+  // Map backend client → local Client format
+  const mapBackendClient = (c: BackendClient): Client => ({
+    id: String(c.id),
+    name: c.profile ? `${c.profile.firstName ?? ""} ${c.profile.lastName ?? ""}`.trim() || c.email : c.email,
+    avatar: c.profile?.avatar ?? `https://api.dicebear.com/9.x/glass/svg?seed=${encodeURIComponent(c.email)}`,
+    email: c.email,
+    phone: c.phone ?? "—",
+    socials: {},
+    status: mapBackendStatus(c.status),
+    restrictions: "none",
+    lastInteraction: c.lastInteraction ?? "—",
+    bookingCount: c.bookingCount ?? (c.reservations?.length ?? 0),
+    history: (c.reservations ?? []).map(r => ({
+      id: String(r.id),
+      date: r.startDate?.split("T")[0] ?? "—",
+      space: r.space?.name ?? "—",
+      status: r.status === "COMPLETED" ? "completed" : r.status === "CANCELLED" ? "cancelled" : "upcoming",
+    })),
+  });
+
+  const isLive = !isError && !!backendClients;
+
+  // Local store as fallback
+  const { clients: localClients, addClient, updateClient, deleteClient: deleteLocalClient } = useClientStore();
+
+  const clients: Client[] = useMemo(() => {
+    if (backendClients && backendClients.length > 0) {
+      return backendClients.map(mapBackendClient);
+    }
+    return localClients;
+  }, [backendClients, localClients]);
+  // ─────────────────────────────────────────────────────────────
+
+  const [copiedRestriction, setCopiedRestriction] = useState<ClientRestriction | null>(null);
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
@@ -196,11 +417,36 @@ export function ClientsTable() {
   });
 
   const toggleStatus = (clientId: string, newStatus: ClientStatus) => {
-    updateClient(clientId, { status: newStatus });
+    const backendId = parseInt(clientId);
+    if (!isNaN(backendId) && isLive) {
+      const backendStatus: BackendClient["status"] =
+        newStatus === "banned" ? "BANNED" : "ACTIVE";
+      updateStatusMutation.mutate({ id: backendId, status: backendStatus });
+    } else {
+      updateClient(clientId, { status: newStatus });
+    }
   };
 
   const toggleRestriction = (clientId: string, newRestriction: ClientRestriction) => {
-    updateClient(clientId, { restrictions: newRestriction });
+    const backendId = parseInt(clientId);
+    if (!isNaN(backendId) && isLive) {
+      updateRestrictionsMutation.mutate({
+        id: backendId,
+        restrictions: JSON.stringify(newRestriction),
+      });
+    } else {
+      updateClient(clientId, { restrictions: newRestriction });
+    }
+  };
+
+  const handleDeleteClient = (clientId: string) => {
+    if (!confirm("Supprimer ce client ?")) return;
+    const backendId = parseInt(clientId);
+    if (!isNaN(backendId) && isLive) {
+      deleteClientMutation.mutate(backendId);
+    } else {
+      deleteLocalClient(clientId);
+    }
   };
 
   const handleAddClient = () => {
@@ -223,6 +469,7 @@ export function ClientsTable() {
     setNewClientData({ name: "", email: "", phone: "" });
     setIsAddClientOpen(false);
   };
+
 
   const filteredAndSortedClients = useMemo(() => {
     const result = clients.filter((client) => {
@@ -302,13 +549,11 @@ export function ClientsTable() {
 
   return (
     <div className="w-full h-full flex flex-col bg-card text-card-foreground overflow-hidden">
-      {/* Header */}
+      {/* Header - Simplified to only filters/actions as main header is centralized */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3.5 border-b">
         <div className="flex items-center gap-3">
-          <SidebarTrigger className="-ml-2" />
-          <h3 className="font-semibold text-lg tracking-tight">Lead Management</h3>
-          <div className="h-5 w-px bg-border hidden sm:block" />
-          <div className="hidden sm:flex items-center gap-2">
+          <div className="flex items-center gap-2">
+
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
               <Input
@@ -318,6 +563,27 @@ export function ClientsTable() {
                 className="pl-8 h-8 w-[250px] text-sm bg-muted/50 border-border/50"
               />
             </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="h-8 gap-1.5 border-primary/30 text-primary hover:bg-primary/5">
+                  <Upload className="size-3.5" />
+                  Importer
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Source d'importation</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => window.location.href = '/?view=clients-import'} className="cursor-pointer">
+                  <Database className="size-4 mr-2 text-emerald-500" />
+                  Google Forms (Automatique)
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer opacity-50">
+                  <TableIcon className="size-4 mr-2 text-blue-500" />
+                  Fichier CSV / Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <Sheet open={isAddClientOpen} onOpenChange={setIsAddClientOpen}>
               <SheetTrigger asChild>
@@ -452,7 +718,8 @@ export function ClientsTable() {
               </TableHead>
               <TableHead className="w-[120px]">Statut</TableHead>
               <TableHead className="w-[150px]">Restrictions</TableHead>
-              <TableHead className="w-[180px]">Contact</TableHead>
+              <TableHead className="w-[150px]">Téléphone</TableHead>
+              <TableHead className="w-[200px]">Email</TableHead>
               <TableHead className="w-[140px]">Réseaux</TableHead>
               <TableHead className="w-[160px]">
                 <button
@@ -475,40 +742,167 @@ export function ClientsTable() {
                     <Checkbox
                       checked={selectedClients.includes(client.id)}
                       onCheckedChange={() => toggleSelectClient(client.id)}
-                      className="border-border/50 bg-background/70"
+                      className="border-border/50 bg-background/70 z-10"
                     />
-                    <div className="relative">
-                      <Avatar className="size-8">
-                        <AvatarImage src={client.avatar} />
-                        <AvatarFallback>{client.name[0]}</AvatarFallback>
-                      </Avatar>
-                      {client.status === "subscribed" && (
-                        <div className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full border-2 border-background p-0.5">
-                          <ShieldCheck className="size-2 text-white" />
+                    <Sheet>
+                      <SheetTrigger asChild>
+                        <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity flex-1 ml-1 pl-1">
+                          <div className="relative">
+                            <Avatar className="size-8">
+                              <AvatarImage src={client.avatar} />
+                              <AvatarFallback>{client.name[0]}</AvatarFallback>
+                            </Avatar>
+                            {client.status === "subscribed" && (
+                              <div className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full border-2 border-background p-0.5">
+                                <ShieldCheck className="size-2 text-white" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col text-left">
+                            <span className="font-medium text-sm">{client.name}</span>
+                            <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{client.email}</span>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="font-medium text-sm">{client.name}</span>
-                      <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{client.email}</span>
-                    </div>
+                      </SheetTrigger>
+                      <SheetContent side="right" className="sm:max-w-md overflow-y-auto">
+                        <SheetHeader className="mb-6">
+                          <div className="flex flex-col items-center justify-center pt-6 pb-2">
+                            <Avatar className="size-24 shadow-sm border-4 border-background mb-4">
+                              <AvatarImage src={client.avatar} />
+                              <AvatarFallback className="text-3xl">{client.name[0]}</AvatarFallback>
+                            </Avatar>
+                            <SheetTitle className="text-2xl">{client.name}</SheetTitle>
+                          </div>
+                        </SheetHeader>
+                        <SheetDescription asChild>
+                          <div className="space-y-6 text-foreground/90">
+                            {/* General Info */}
+                            <div className="space-y-3">
+                              <h3 className="font-semibold text-sm tracking-tight text-foreground border-b pb-2 flex items-center gap-2">
+                                <User className="size-4" /> Informations Générales
+                              </h3>
+                              <div className="grid grid-cols-2 gap-4 text-xs bg-muted/30 p-4 rounded-xl">
+                                <div className="space-y-1">
+                                  <span className="text-muted-foreground flex items-center gap-1"><Mail className="size-3" /> Email</span>
+                                  <span className="font-medium break-all">{client.email}</span>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-muted-foreground flex items-center gap-1"><Phone className="size-3" /> Téléphone</span>
+                                  <span className="font-medium">{client.phone}</span>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-muted-foreground flex items-center gap-1"><Activity className="size-3" /> Statut</span>
+                                  <div className="-ml-1"><StatusBadge status={client.status} onToggle={(s) => toggleStatus(client.id, s)} /></div>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-muted-foreground flex items-center gap-1"><Calendar className="size-3" /> Dernière act.</span>
+                                  <span className="font-medium">{client.lastInteraction}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Restrictions Info */}
+                            <div className="space-y-3">
+                              <h3 className="font-semibold text-sm tracking-tight text-foreground border-b pb-2 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <ShieldCheck className="size-4 text-amber-500" />
+                                  <span>Restrictions Appliquées</span>
+                                </div>
+                                <div className="scale-[0.80] origin-right"><RestrictionBadge restriction={client.restrictions} clientId={client.id} onToggle={(r) => toggleRestriction(client.id, r)} /></div>
+                              </h3>
+                              <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 text-xs leading-relaxed text-amber-900 dark:text-amber-200">
+                                {client.restrictions === "none" ? (
+                                  <div className="flex items-center gap-2 opacity-70">
+                                    <Check className="size-4" /> Ce client n'a aucune restriction. Tout est autorisé.
+                                  </div>
+                                ) : client.restrictions === "all" ? (
+                                  <div className="flex items-center gap-2 text-red-600 dark:text-red-400 font-medium">
+                                    <Ban className="size-4" /> Ce client est bloqué de toute réservation.
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    {((client.restrictions as any).rules || []).length > 0 && (
+                                      <div>
+                                        <p className="font-semibold mb-1 uppercase tracking-wider text-[10px] opacity-70">Règles de quantité :</p>
+                                        <ul className="list-disc pl-5 space-y-1">
+                                          {(client.restrictions as any).rules?.map((rule: any, idx: number) => (
+                                            <li key={idx}>
+                                              <span className="font-bold">{rule.type}</span> : {rule.operator === "max" ? "Max" : rule.operator === "min" ? "Min" : "Exact."} {rule.value} place(s)
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {((client.restrictions as any).forbiddenPlaces || []).length > 0 && (
+                                      <div>
+                                        <p className="font-semibold mb-1 uppercase tracking-wider text-[10px] opacity-70">Lieux interdits :</p>
+                                        <div className="flex items-center gap-2 font-medium">
+                                          <Ban className="size-3.5 opacity-70" /> {((client.restrictions as any).forbiddenPlaces || []).length} emplacement(s) sur le plan.
+                                        </div>
+                                      </div>
+                                    )}
+                                    {!((client.restrictions as any).rules || []).length && !((client.restrictions as any).forbiddenPlaces || []).length && (
+                                      <span className="opacity-70 italic">Restrictions personnalisées appliquées.</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Socials */}
+                            <div className="space-y-3">
+                              <h3 className="font-semibold text-sm tracking-tight text-foreground border-b pb-2 flex items-center gap-2">
+                                <Share2 className="size-4" /> Réseaux Sociaux
+                              </h3>
+                              <div className="flex gap-2 text-xs">
+                                {client.socials.facebook ? (
+                                  <div className="flex items-center gap-2 border border-blue-500/20 bg-blue-500/5 rounded-lg px-3 py-2 flex-1 text-blue-600 dark:text-blue-400 font-medium">
+                                    <Facebook className="size-4" /> Facebook
+                                  </div>
+                                ) : null}
+                                {client.socials.whatsapp ? (
+                                  <div className="flex items-center gap-2 border border-emerald-500/20 bg-emerald-500/5 rounded-lg px-3 py-2 flex-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                                    <MessageCircle className="size-4" /> WhatsApp
+                                  </div>
+                                ) : null}
+                                {!client.socials.facebook && !client.socials.whatsapp && (
+                                  <div className="text-muted-foreground italic px-2 py-1">Aucun compte social lié.</div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Stats */}
+                            <div className="space-y-3">
+                              <h3 className="font-semibold text-sm tracking-tight text-foreground border-b pb-2 flex items-center gap-2">
+                                <Target className="size-4" /> Statistiques
+                              </h3>
+                              <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 flex items-center justify-between">
+                                <span className="text-sm font-medium text-foreground">Nombre de réservations</span>
+                                <Badge variant="default" className="text-sm px-3">{client.bookingCount}</Badge>
+                              </div>
+                            </div>
+                          </div>
+                        </SheetDescription>
+                      </SheetContent>
+                    </Sheet>
                   </div>
                 </TableCell>
                 <TableCell>
                   <StatusBadge status={client.status} onToggle={(s) => toggleStatus(client.id, s)} />
                 </TableCell>
                 <TableCell>
-                  <RestrictionBadge restriction={client.restrictions} onToggle={(r) => toggleRestriction(client.id, r)} />
+                  <RestrictionBadge restriction={client.restrictions} clientId={client.id} onToggle={(r) => toggleRestriction(client.id, r)} />
                 </TableCell>
                 <TableCell>
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <Phone className="size-3 text-muted-foreground" />
-                      {client.phone}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
-                      {client.email.split('@')[0]}@...
-                    </div>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <Phone className="size-3 text-muted-foreground" />
+                    {client.phone}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <Mail className="size-3 text-muted-foreground" />
+                    <span className="truncate max-w-[180px]">{client.email}</span>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -543,6 +937,18 @@ export function ClientsTable() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
                       <DropdownMenuLabel>Actions rapide</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setCopiedRestriction(client.restrictions)}>
+                        <Copy className="size-4 mr-2" />
+                        Copier Restrictions
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        disabled={!copiedRestriction}
+                        onClick={() => copiedRestriction && toggleRestriction(client.id, copiedRestriction)}
+                      >
+                        <ClipboardPaste className="size-4 mr-2" />
+                        Coller Restrictions
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <Sheet>
                         <SheetTrigger asChild>
@@ -586,6 +992,7 @@ export function ClientsTable() {
                         <Ban className="size-4 mr-2" />
                         Bannir le client
                       </DropdownMenuItem>
+
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

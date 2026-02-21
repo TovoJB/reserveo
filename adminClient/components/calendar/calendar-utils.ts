@@ -1,9 +1,14 @@
-export const HOURS_24 = Array.from({ length: 24 }, (_, i) => {
-  if (i === 0) return "12 AM";
-  if (i < 12) return `${i} AM`;
-  if (i === 12) return "12 PM";
-  return `${i - 12} PM`;
-});
+export const getHoursRange = (start: number, end: number) => {
+  return Array.from({ length: end - start + 1 }, (_, i) => {
+    const hour = start + i;
+    if (hour === 0 || hour === 24) return "12 AM";
+    if (hour < 12) return `${hour} AM`;
+    if (hour === 12) return "12 PM";
+    return `${hour - 12} PM`;
+  });
+};
+
+export const HOURS_24 = getHoursRange(0, 23);
 
 export const HOUR_HEIGHT = 120;
 export const INITIAL_SCROLL_OFFSET = 9 * HOUR_HEIGHT;
@@ -23,17 +28,17 @@ export function getEventHeight(startTime: string, endTime: string): number {
   return Math.max(40, Math.round((duration / 60) * HOUR_HEIGHT));
 }
 
-export function getEventTop(startTime: string): number {
+export function getEventTop(startTime: string, startRangeHour: number = 0): number {
   const [hour, minute] = startTime.split(":").map(Number);
-  const totalMinutes = hour * 60 + (minute || 0);
+  const totalMinutes = (hour * 60 + (minute || 0)) - (startRangeHour * 60);
   const offset = totalMinutes * (HOUR_HEIGHT / 60);
   return Math.max(0, Math.round(offset));
 }
 
-export function getCurrentTimePosition(date: Date = new Date()): number {
+export function getCurrentTimePosition(date: Date = new Date(), startRangeHour: number = 0): number {
   const hour = date.getHours();
   const minute = date.getMinutes();
-  const totalMinutes = hour * 60 + minute;
+  const totalMinutes = (hour * 60 + minute) - (startRangeHour * 60);
   const offset = totalMinutes * (HOUR_HEIGHT / 60);
   return Math.max(0, Math.round(offset));
 }

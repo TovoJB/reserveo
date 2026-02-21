@@ -6,8 +6,9 @@ import {
   subWeeks,
   addDays,
   getDay,
+  startOfDay,
 } from "date-fns";
-import { Event, events, addEvent as addEventToStore } from "@/mock-data/events";
+import { Event, addEvent as addEventToStore } from "@/mock-data/events";
 
 interface CalendarState {
   currentWeekStart: Date;
@@ -38,32 +39,11 @@ function getDayOfWeek(date: Date): number {
 }
 
 function getEventsForWeek(startDate: Date): Event[] {
-  const weekEvents: Event[] = [];
-
-  for (let i = 0; i < 7; i++) {
-    const currentDay = addDays(startDate, i);
-    const currentDayOfWeek = getDayOfWeek(currentDay);
-
-    events.forEach((event) => {
-      const eventDate = new Date(event.date);
-      const eventDayOfWeek = getDayOfWeek(eventDate);
-
-      if (eventDayOfWeek === currentDayOfWeek) {
-        const eventDateStr = format(currentDay, "yyyy-MM-dd");
-        weekEvents.push({
-          ...event,
-          id: `${event.id}-${eventDateStr}`,
-          date: eventDateStr,
-        });
-      }
-    });
-  }
-
-  return weekEvents;
+  return [];
 }
 
 export const useCalendarStore = create<CalendarState>((set, get) => ({
-  currentWeekStart: startOfWeek(new Date(), { weekStartsOn: 1 }),
+  currentWeekStart: startOfDay(new Date()),
   searchQuery: "",
   eventTypeFilter: "all",
   participantsFilter: "all",
@@ -80,12 +60,12 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
 
   goToToday: () =>
     set({
-      currentWeekStart: startOfWeek(new Date(), { weekStartsOn: 1 }),
+      currentWeekStart: startOfDay(new Date()),
     }),
 
   goToDate: (date: Date) =>
     set({
-      currentWeekStart: startOfWeek(date, { weekStartsOn: 1 }),
+      currentWeekStart: startOfDay(date),
     }),
 
   setSearchQuery: (query: string) => set({ searchQuery: query }),

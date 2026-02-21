@@ -44,7 +44,6 @@ export const collections: Collection[] = [
     count: 8,
   },
   { id: "public", name: "Espaces Publics", icon: "users", color: "blue", count: 12 },
-  { id: "luxe", name: "Espaces de Luxe", icon: "sparkles", color: "amber", count: 6 },
 ];
 
 export const tags: Tag[] = [

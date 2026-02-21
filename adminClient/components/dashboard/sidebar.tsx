@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useClerk } from "@clerk/nextjs";
 import {
   Sidebar,
   SidebarContent,
@@ -12,6 +13,7 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -78,18 +80,17 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  // { title: "Search", icon: Search, shortcut: "/" },
+  { title: "Dashboard", icon: BarChart3 },
   { title: "Gestion Clients", icon: UserPlus },
-  { title: "Dashboard", icon: BarChart3, isActive: true, shortcut: "/" },
   { title: "Réservation Admin", icon: MousePointerClick },
   { title: "Liste des Réservations", icon: CheckSquare },
   { title: "Plan de Salle", icon: Globe },
   { title: "Modèles d'Espaces", icon: Layers },
+  { title: "Types & Paramètres", icon: Building },
   { title: "Calendrier", icon: Calendar },
   { title: "Equipes", icon: Users },
   { title: "Développement", icon: Code },
   { title: "Support", icon: Headphones },
-  // { title: "Company", icon: Building },
 ];
 
 
@@ -109,6 +110,7 @@ export function DashboardSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   const searchParams = useSearchParams();
+  const { signOut } = useClerk();
   const currentViewId = searchParams?.get("id");
 
   const { groups, expandedItems, addItem, deleteItem, toggleItem, setExpandedItems } = useWorkgroupStore();
@@ -215,13 +217,12 @@ export function DashboardSidebar({
           <SidebarMenuItem>
             <CollapsibleTrigger asChild>
               <SidebarMenuButton
-                className="h-7 text-sm group pr-1"
+                className="h-7 text-sm group pr-8"
                 style={{ paddingLeft: `${8 + paddingLeft}px` }}
               >
                 <Icon className="size-3.5" />
                 <span className="flex-1 truncate">{item.name}</span>
                 <div className="flex items-center gap-1 ml-auto">
-                  <ItemActions />
                   {isExpanded ? (
                     <ChevronDown className="size-3 text-muted-foreground" />
                   ) : (
@@ -230,6 +231,9 @@ export function DashboardSidebar({
                 </div>
               </SidebarMenuButton>
             </CollapsibleTrigger>
+            <SidebarMenuAction asChild showOnHover>
+              <ItemActions />
+            </SidebarMenuAction>
             <CollapsibleContent>
               <SidebarMenuSub className="mr-0 pr-0">
                 {item.children?.map((child) => (
@@ -258,17 +262,17 @@ export function DashboardSidebar({
         <SidebarMenuButton
           asChild
           isActive={isActive}
-          className="h-7 text-sm group pr-1"
+          className="h-7 text-sm group pr-8"
           style={{ paddingLeft: `${8 + paddingLeft}px` }}
         >
-          <div className="flex items-center w-full">
-            <Link href={`/?view=plan&id=${item.id}`} className="flex items-center flex-1 min-w-0 gap-2 overflow-hidden">
-              <Icon className="size-3.5 shrink-0" />
-              <span className="truncate">{item.name}</span>
-            </Link>
-            <ItemActions />
-          </div>
+          <Link href={`/?view=plan&id=${item.id}`} className="flex items-center flex-1 min-w-0 gap-2 overflow-hidden">
+            <Icon className="size-3.5 shrink-0" />
+            <span className="truncate">{item.name}</span>
+          </Link>
         </SidebarMenuButton>
+        <SidebarMenuAction asChild showOnHover>
+          <ItemActions />
+        </SidebarMenuAction>
       </SidebarMenuItem>
     );
   };
@@ -289,6 +293,12 @@ export function DashboardSidebar({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuItem asChild>
+              <Link href="/?view=profile" className="flex items-center gap-2 cursor-pointer">
+                <Building className="size-4" />
+                <span>Mon Profil</span>
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem>
               <Settings className="size-4" />
               <span>Settings</span>
@@ -298,7 +308,10 @@ export function DashboardSidebar({
               <span>Invite members</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive cursor-pointer"
+              onClick={() => signOut()}
+            >
               <LogOut className="size-4" />
               <span>Log out</span>
             </DropdownMenuItem>
@@ -315,15 +328,17 @@ export function DashboardSidebar({
                   <SidebarMenuButton
                     asChild
                     isActive={
-                      (item.title === "Dashboard" && !currentViewId && !searchParams?.get("view")) ||
+                      (item.title === "Dashboard" && !searchParams?.get("view")) ||
                       (item.title === "Calendrier" && searchParams?.get("view") === "calendar") ||
                       (item.title === "Modèles d'Espaces" && searchParams?.get("view") === "bookmarks") ||
+                      (item.title === "Types & Paramètres" && searchParams?.get("view") === "types") ||
                       (item.title === "Gestion Clients" && searchParams?.get("view") === "clients") ||
                       (item.title === "Liste des Réservations" && searchParams?.get("view") === "tasks") ||
                       (item.title === "Plan de Salle" && searchParams?.get("view") === "bookings") ||
                       (item.title === "Réservation Admin" && searchParams?.get("view") === "admin-reservation") ||
                       (item.title === "Développement" && searchParams?.get("view") === "development") ||
-                      (item.title === "Support" && searchParams?.get("view") === "support")
+                      (item.title === "Support" && searchParams?.get("view") === "support") ||
+                      (item.title === "Equipes" && searchParams?.get("view") === "teams")
                     }
                     className="h-7"
                   >
@@ -331,20 +346,17 @@ export function DashboardSidebar({
                       item.title === "Dashboard" ? "/" :
                         item.title === "Calendrier" ? "/?view=calendar" :
                           item.title === "Modèles d'Espaces" ? "/?view=bookmarks" :
-                            item.title === "Gestion Clients" ? "/?view=clients" :
-                              item.title === "Liste des Réservations" ? "/?view=tasks" :
-                                item.title === "Plan de Salle" ? "/?view=bookings" :
-                                  item.title === "Réservation Admin" ? "/?view=admin-reservation" :
-                                    item.title === "Développement" ? "/?view=development" :
-                                      item.title === "Support" ? "/?view=support" : "#"
+                            item.title === "Types & Paramètres" ? "/?view=types" :
+                              item.title === "Gestion Clients" ? "/?view=clients" :
+                                item.title === "Liste des Réservations" ? "/?view=tasks" :
+                                  item.title === "Plan de Salle" ? "/?view=bookings" :
+                                    item.title === "Réservation Admin" ? "/?view=admin-reservation" :
+                                      item.title === "Développement" ? "/?view=development" :
+                                        item.title === "Support" ? "/?view=support" :
+                                          item.title === "Equipes" ? "/?view=teams" : "#"
                     }>
                       <item.icon className="size-3.5" />
                       <span className="text-sm">{item.title}</span>
-                      {'shortcut' in item && item.shortcut && (
-                        <span className="ml-auto flex size-5 items-center justify-center rounded bg-muted text-[10px] font-medium text-muted-foreground">
-                          {item.shortcut}
-                        </span>
-                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -436,19 +448,7 @@ export function DashboardSidebar({
       </SidebarContent>
 
       <SidebarFooter className="px-2.5 pb-3 group-data-[collapsible=icon]:hidden">
-        <div className="group/sidebar relative flex flex-col gap-2 rounded-lg border p-4 text-sm w-full bg-background">
-          <div className="text-balance text-lg font-semibold leading-tight group-hover/sidebar:underline">
-            hello
-          </div>
-          <div className="text-muted-foreground">
-            besoin d aide contacte notre team
-          </div>
-          <Button size="sm" className="w-full" asChild>
-            <Link href="/?view=support">
-              contact admin
-            </Link>
-          </Button>
-        </div>
+        {/* Placeholder removed */}
       </SidebarFooter>
     </Sidebar>
   );

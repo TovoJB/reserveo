@@ -45,7 +45,7 @@ function TrashedBookmarkCard({ bookmark }: { bookmark: Bookmark }) {
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-xs">
+            <Button variant="ghost" size="icon-sm">
               <MoreHorizontal className="size-4" />
             </Button>
           </DropdownMenuTrigger>

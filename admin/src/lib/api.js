@@ -1,49 +1,76 @@
 import axiosInstance from "./axios";
 
-export const productApi = {
-  getAll: async () => {
-    const { data } = await axiosInstance.get("/admin/products");
+export const reservationApi = {
+  getAll: async (filters = {}) => {
+    const { data } = await axiosInstance.get("/reservations", { params: filters });
     return data;
   },
 
-  create: async (formData) => {
-    const { data } = await axiosInstance.post("/admin/products", formData);
+  getById: async (id) => {
+    const { data } = await axiosInstance.get(`/reservations/${id}`);
     return data;
   },
 
-  update: async ({ id, formData }) => {
-    const { data } = await axiosInstance.put(`/admin/products/${id}`, formData);
+  create: async (reservationData) => {
+    const { data } = await axiosInstance.post("/reservations", reservationData);
     return data;
   },
 
-  delete: async (productId) => {
-    const { data } = await axiosInstance.delete(`/admin/products/${productId}`);
+  update: async ({ id, ...reservationData }) => {
+    const { data } = await axiosInstance.put(`/reservations/${id}`, reservationData);
+    return data;
+  },
+
+  updateStatus: async ({ id, status }) => {
+    const { data } = await axiosInstance.patch(`/reservations/${id}/status`, { status });
+    return data;
+  },
+
+  delete: async (id) => {
+    const { data } = await axiosInstance.delete(`/reservations/${id}`);
     return data;
   },
 };
 
-export const orderApi = {
+export const clientApi = {
   getAll: async () => {
-    const { data } = await axiosInstance.get("/admin/orders");
+    const { data } = await axiosInstance.get("/clients");
     return data;
   },
 
-  updateStatus: async ({ orderId, status }) => {
-    const { data } = await axiosInstance.patch(`/admin/orders/${orderId}/status`, { status });
+  getById: async (id) => {
+    const { data } = await axiosInstance.get(`/clients/${id}`);
+    return data;
+  },
+
+  update: async ({ id, ...clientData }) => {
+    const { data } = await axiosInstance.put(`/clients/${id}`, clientData);
+    return data;
+  },
+
+  updateStatus: async ({ id, status }) => {
+    const { data } = await axiosInstance.patch(`/clients/${id}/status`, { status });
+    return data;
+  },
+
+  delete: async (id) => {
+    const { data } = await axiosInstance.delete(`/clients/${id}`);
+    return data;
+  },
+};
+
+export const spaceApi = {
+  getAll: async () => {
+    const { data } = await axiosInstance.get("/spaces");
     return data;
   },
 };
 
 export const statsApi = {
   getDashboard: async () => {
-    const { data } = await axiosInstance.get("/admin/stats");
-    return data;
-  },
-};
-
-export const customerApi = {
-  getAll: async () => {
-    const { data } = await axiosInstance.get("/admin/customers");
+    // This might need a specific endpoint in the backend
+    // For now, we'll try to get it from a general stats route if it exists
+    const { data } = await axiosInstance.get("/configuration"); // Place-holder or check if exists
     return data;
   },
 };

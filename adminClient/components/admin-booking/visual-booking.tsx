@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { format } from "date-fns";
+import { format, addHours, addMinutes, addDays, parse, isValid } from "date-fns";
 import {
     Calendar as CalendarIcon,
     Clock,
@@ -19,7 +19,11 @@ import {
     MousePointer2,
     Hand,
     Lock,
-    Search
+    Search,
+    Map,
+    ArrowLeft,
+    Ban,
+    Trash2
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -52,6 +56,8 @@ type InteractionMode = 'select' | 'pan';
 
 import { useWorkgroupStore, WorkgroupItem } from "@/store/workgroup-store";
 import { useBookingStore, Reservation as StoreReservation } from "@/store/booking-store";
+import { useClientStore } from "@/store/client-store";
+import { useTypesStore, getPricingPolicyLabel } from "@/store/types-store";
 import {
     Select,
     SelectContent,
@@ -59,11 +65,31 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { useRouter } from "next/navigation";
+import { ClientRestrictionDetails } from "@/mock-data/dashboard";
 
 export function VisualBookingAdmin() {
     const searchParams = useSearchParams();
+    const router = useRouter();
     const { groups } = useWorkgroupStore();
-    const { reservations: storeReservations, addReservation, removeReservation } = useBookingStore();
+    const { reservations: storeReservations, addReservation, removeReservation, removeReservationById } = useBookingStore();
+    const { reservationFields, openingHours, pricingPolicies } = useTypesStore();
+    const { clients, updateClient } = useClientStore();
+
+    // Restriction Mode params
+    const isRestrictMode = searchParams.get("mode") === "restrict";
+    const restrictClientId = searchParams.get("clientId");
+    const targetClient = useMemo(() =>
+        clients.find(c => c.id === restrictClientId)
+        , [clients, restrictClientId]);
+
+    const forbiddenPlaces = useMemo(() => {
+        if (!targetClient || targetClient.restrictions === "none" || targetClient.restrictions === "all") {
+            return [];
+        }
+        return (targetClient.restrictions as ClientRestrictionDetails).forbiddenPlaces || [];
+    }, [targetClient]);
 
     // Get all available floor plans from workgroups
     const allFloorPlans = React.useMemo(() => {
@@ -124,15 +150,21 @@ export function VisualBookingAdmin() {
     // Interaction Mode
     const [mode, setMode] = useState<InteractionMode>('select');
 
-    // Filtered reservations for current floor
-    const reservations = React.useMemo(() => {
-        const filtered: Record<string, any> = {};
+    // List of reservations for today or future for each element
+    const reservationsByElement = React.useMemo(() => {
+        const map: Record<string, any[]> = {};
+        const todayStr = format(new Date(), "yyyy-MM-dd");
+
         Object.values(storeReservations).forEach(res => {
             if (res.floorId === floorId) {
-                filtered[res.elementId] = res;
+                const resDate = res.date.split("T")[0];
+                if (resDate >= todayStr) {
+                    if (!map[res.elementId]) map[res.elementId] = [];
+                    map[res.elementId].push(res);
+                }
             }
         });
-        return filtered;
+        return map;
     }, [storeReservations, floorId]);
 
     // Zoom & Pan State
@@ -147,13 +179,16 @@ export function VisualBookingAdmin() {
     const [bounds, setBounds] = useState({ minX: 0, minY: 0, width: 0, height: 0 });
 
 
-    // Form State
-    const [formData, setFormData] = useState({
+    // Dynamic Form State
+    const [formData, setFormData] = useState<any>({
         customerName: "",
         customerPhone: "",
         date: new Date(),
-        time: "19:00",
-        notes: ""
+        time: format(new Date(), "HH:mm"),
+        notes: "",
+        customFields: {}, // Store custom field values here
+        offer: "hour",
+        exitTimeFree: format(addDays(new Date(), 0), "HH:mm") // Just placeholder
     });
 
     // Helper: Get Descendants
@@ -172,36 +207,83 @@ export function VisualBookingAdmin() {
     }, []);
 
     // Load Data
+    const loadData = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const stored = localStorage.getItem(`reserveo-floor-${floorId}`);
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                setElements(parsed.elements || []);
+                setAppState(parsed.appState || {});
+                setFiles(parsed.files || {});
+            } else if (floorId === "default-plan") {
+                const res = await fetch('/data/florplan1.excalidraw');
+                const data = await res.json();
+                setElements(data.elements || []);
+                setAppState(data.appState || {});
+                setFiles(data.files || []);
+                localStorage.setItem(`reserveo-floor-${floorId}`, JSON.stringify(data));
+            } else {
+                setElements([]);
+            }
+        } catch (error) {
+            console.error("Failed to load floor data:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [floorId]);
+
     useEffect(() => {
-        const loadData = async () => {
-            setIsLoading(true);
-            try {
-                const stored = localStorage.getItem(`reserveo-floor-${floorId}`);
-                if (stored) {
-                    const parsed = JSON.parse(stored);
-                    setElements(parsed.elements || []);
-                    setAppState(parsed.appState || {});
-                    setFiles(parsed.files || {});
-                } else if (floorId === "default-plan") {
-                    // Fallback to fetch default plan if not in storage
-                    const res = await fetch('/data/florplan1.excalidraw');
-                    const data = await res.json();
-                    setElements(data.elements || []);
-                    setAppState(data.appState || {});
-                    setFiles(data.files || []);
-                    // Cache it
-                    localStorage.setItem(`reserveo-floor-${floorId}`, JSON.stringify(data));
-                } else {
-                    setElements([]);
-                }
-            } catch (error) {
-                console.error("Failed to load floor data:", error);
-            } finally {
-                setIsLoading(false);
+        loadData();
+    }, [loadData]);
+
+    const handleToggleRestriction = (elementId: string) => {
+        if (!targetClient || !restrictClientId) return;
+
+        const currentRestrictions = targetClient.restrictions;
+        let details: ClientRestrictionDetails = { rules: [], forbiddenPlaces: [] };
+
+        if (currentRestrictions === "all") {
+            // If they are blocked for everything, maybe we don't need to toggle specific places, 
+            // but for consistency let's assume they want to manage specific places
+            details = { rules: [], forbiddenPlaces: [] };
+        } else if (currentRestrictions !== "none") {
+            if (Array.isArray(currentRestrictions)) {
+                details = { rules: currentRestrictions, forbiddenPlaces: [] };
+            } else {
+                details = { ...currentRestrictions };
+            }
+        }
+
+        const currentForbidden = details.forbiddenPlaces || [];
+        const isAlreadyForbidden = currentForbidden.includes(elementId);
+
+        const newForbidden = isAlreadyForbidden
+            ? currentForbidden.filter(id => id !== elementId)
+            : [...currentForbidden, elementId];
+
+        updateClient(restrictClientId, {
+            restrictions: {
+                ...details,
+                forbiddenPlaces: newForbidden
+            }
+        });
+    };
+
+    // Sync with editor changes
+    useEffect(() => {
+        const handleSync = (e: any) => {
+            if (e.key === `reserveo-floor-${floorId}` || e.type === 'reserveo-list-update') {
+                loadData();
             }
         };
-        loadData();
-    }, [floorId]);
+        window.addEventListener('storage', handleSync);
+        window.addEventListener('reserveo-list-update', handleSync);
+        return () => {
+            window.removeEventListener('storage', handleSync);
+            window.removeEventListener('reserveo-list-update', handleSync);
+        };
+    }, [floorId, loadData]);
 
     // Calculate Bounds
     useEffect(() => {
@@ -375,47 +457,37 @@ export function VisualBookingAdmin() {
 
         if (mode === 'pan') return;
 
-        // Check if any descendant is reserved
-        const descendants = getDescendants(element.id, elements);
-        const hasReservedChild = descendants.some(childId => !!reservations[childId]);
-
-        // If it's a parent element and a child is reserved -> Error
-        if (hasReservedChild && !reservations[element.id]) {
-            // In a real app show a toast
-            alert("Impossible de réserver cet espace : une partie (enfant) est déjà réservée.");
+        if (isRestrictMode) {
+            handleToggleRestriction(element.id);
             return;
         }
 
-        const isReserved = !!reservations[element.id];
+        // Check if any descendant is reserved
+        const descendants = getDescendants(element.id, elements);
+        // We consider it partially reserved if any descendant has at least one reservation
+        const hasReservedChild = descendants.some(childId => (reservationsByElement[childId]?.length || 0) > 0);
 
-        // Prepare info about what will be reserved
-        const affectedElements = [element.id, ...descendants];
+        const resList = reservationsByElement[element.id] || [];
+        const isReserved = resList.length > 0;
 
         setSelectedElement({
             ...element,
             isReserved,
             descendants,
-            hasReservedChild
+            hasReservedChild,
+            reservations: resList
         });
 
-        if (isReserved) {
-            const res = reservations[element.id];
-            setFormData({
-                customerName: res.customerName,
-                customerPhone: res.customerPhone,
-                date: res.date,
-                time: res.time,
-                notes: "Déjà réservé"
-            });
-        } else {
-            setFormData({
-                customerName: "",
-                customerPhone: "",
-                date: new Date(),
-                time: "19:00",
-                notes: ""
-            });
-        }
+        setFormData({
+            customerName: "",
+            customerPhone: "",
+            date: new Date(),
+            time: format(new Date(), "HH:mm"),
+            notes: "",
+            customFields: { reservedBy: "Admin" },
+            offer: pricingPolicies[0] || "hour",
+            exitTimeFree: format(addDays(new Date(), 0), "HH:mm")
+        });
 
         setIsSheetOpen(true);
     };
@@ -425,17 +497,69 @@ export function VisualBookingAdmin() {
             const descendants = getDescendants(selectedElement.id, elements);
             const allIds = [selectedElement.id, ...descendants];
 
+            const entryDateTime = parse(`${format(formData.date, "yyyy-MM-dd")} ${formData.time}`, "yyyy-MM-dd HH:mm", new Date());
+            let exitDateTime = addHours(entryDateTime, 1);
+
+            const unit = formData.offer || "hour";
+            const dayMap: Record<string, string> = {
+                "Monday": "Lundi", "Tuesday": "Mardi", "Wednesday": "Mercredi",
+                "Thursday": "Jeudi", "Friday": "Vendredi", "Saturday": "Samedi", "Sunday": "Dimanche"
+            };
+            const storeDay = dayMap[format(formData.date, "eeee")] || "Lundi";
+            const dayConfig = openingHours[storeDay];
+            const closeTime = dayConfig?.closeTime || "22:00";
+            const closeDateTime = parse(`${format(formData.date, "yyyy-MM-dd")} ${closeTime}`, "yyyy-MM-dd HH:mm", new Date());
+
+            if (unit === "hour") exitDateTime = addHours(entryDateTime, 1);
+            else if (unit === "half-day") {
+                const midDay = parse(`${format(formData.date, "yyyy-MM-dd")} 14:00`, "yyyy-MM-dd HH:mm", new Date());
+                exitDateTime = entryDateTime < midDay ? midDay : closeDateTime;
+            } else if (unit === "day") exitDateTime = closeDateTime;
+            else if (unit === "week") exitDateTime = addDays(closeDateTime, 7);
+            else if (unit === "month") exitDateTime = addDays(closeDateTime, 30);
+            else if (unit === "free") {
+                exitDateTime = parse(`${format(formData.date, "yyyy-MM-dd")} ${formData.exitTimeFree}`, "yyyy-MM-dd HH:mm", new Date());
+                if (exitDateTime > closeDateTime) { alert(`Fermeture à ${closeTime}`); exitDateTime = closeDateTime; }
+                if (exitDateTime < entryDateTime) exitDateTime = addHours(entryDateTime, 1);
+            }
+
+            // --- TEMPORAL CONFLICT CHECK ---
+            const hasConflict = allIds.some(id => {
+                const existing = Object.values(storeReservations).filter(r => r.elementId === id);
+                return existing.some(ex => {
+                    const exEntry = parse(ex.entryTime || `${ex.date.split('T')[0]} ${ex.time}`, "yyyy-MM-dd HH:mm", new Date());
+                    const exExit = ex.exitTime ? parse(ex.exitTime, "yyyy-MM-dd HH:mm", new Date()) : addHours(exEntry, 1);
+
+                    // Overlap check: (StartA < EndB) && (EndA > StartB)
+                    return (entryDateTime < exExit) && (exitDateTime > exEntry);
+                });
+            });
+
+            if (hasConflict) {
+                alert("Conflit de calendrier : Cet emplacement (ou l'un de ses enfants) est déjà réservé sur ce créneau horaire.");
+                return;
+            }
+
+            formData.customFields.offer = unit;
+            if (unit === "free") formData.customFields.exitTimeFree = formData.exitTimeFree;
+
             allIds.forEach(id => {
+                const el = elements.find(e => e.id === id);
                 addReservation({
                     id: `res-${Date.now()}-${id}`,
                     elementId: id,
+                    elementName: el?.customData?.name || id,
+                    elementType: el?.customData?.type || 'Place',
                     customerName: formData.customerName,
                     customerPhone: formData.customerPhone,
                     date: formData.date.toISOString(),
                     time: formData.time,
                     status: 'confirmed',
                     floorId: floorId,
-                    relatedIds: allIds.filter(rid => rid !== id)
+                    relatedIds: allIds.filter(rid => rid !== id),
+                    customFields: formData.customFields,
+                    entryTime: format(entryDateTime, "yyyy-MM-dd HH:mm"),
+                    exitTime: format(exitDateTime, "yyyy-MM-dd HH:mm")
                 });
             });
         }
@@ -452,6 +576,40 @@ export function VisualBookingAdmin() {
             });
         }
         setIsSheetOpen(false);
+    }
+
+    const handleCancelSpecificReservation = (resId: string) => {
+        const resToRemove = storeReservations[resId];
+        if (!resToRemove) return;
+
+        // Remove the main one
+        removeReservationById(resId);
+
+        // Remove related ones (children/parent) if they were made together
+        if (resToRemove.relatedIds?.length) {
+            resToRemove.relatedIds.forEach(rid => {
+                // We need to find the reservation ID for this floor-element that matches this group
+                // In our current implementation, they share the same timestamp in their ID prefix
+                // but it's safer to just delete by element if they are related.
+                // However, removeReservation(floorId, elementId) removes ALL. 
+                // Let's just find the specific related reservation records.
+                Object.values(storeReservations).forEach(r => {
+                    if (r.floorId === floorId && resToRemove.relatedIds?.includes(r.elementId) && r.time === resToRemove.time && r.date === resToRemove.date) {
+                        removeReservationById(r.id);
+                    }
+                });
+            });
+        }
+
+        // Update local state to reflect deletion immediately in the sheet
+        if (selectedElement) {
+            const updatedReservations = selectedElement.reservations.filter((r: any) => r.id !== resId);
+            setSelectedElement({
+                ...selectedElement,
+                reservations: updatedReservations,
+                isReserved: updatedReservations.length > 0
+            });
+        }
     }
 
     if (isLoading) {
@@ -521,6 +679,33 @@ export function VisualBookingAdmin() {
             </div>
 
             {/* Canvas Area */}
+            {isRestrictMode && targetClient && (
+                <div className="bg-amber-500 text-white px-6 py-2 flex items-center justify-between z-30 shadow-md">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-white/20 p-1.5 rounded-full">
+                            <Ban className="size-4" />
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold uppercase tracking-wider">Mode Restriction - Sélection Visuelle</p>
+                            <p className="text-[10px] opacity-90">Client : <span className="font-bold">{targetClient.name}</span> • Cliquez sur les tables pour les interdire.</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <Badge variant="outline" className="text-white border-white/40 bg-white/10 h-7 px-3">
+                            {forbiddenPlaces.length} Place(s) interdite(s)
+                        </Badge>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-8 font-bold text-[10px] gap-2 shadow-sm"
+                            onClick={() => router.push('/?view=clients')}
+                        >
+                            <Check className="size-3.5" /> TERMINER & QUITTER
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             <div
                 ref={containerRef}
                 className={cn(
@@ -550,11 +735,15 @@ export function VisualBookingAdmin() {
                         const svgContent = svgMap[el.id];
                         if (!svgContent) return null;
 
-                        const isReserved = !!reservations[el.id];
+                        const resList = reservationsByElement[el.id] || [];
+                        const todayStr = format(new Date(), "yyyy-MM-dd");
+
+                        const isReservedToday = resList.some(r => r.date.split('T')[0] === todayStr);
+                        const hasFutureReservations = resList.some(r => r.date.split('T')[0] > todayStr);
+
                         const descendants = getDescendants(el.id, elements);
-                        // Check if any child is reserved, making this parent partially blocked if not fully reserved
-                        const hasReservedChild = descendants.some(childId => !!reservations[childId]);
-                        const isPartiallyReserved = !isReserved && hasReservedChild;
+                        const hasReservedChild = descendants.some(childId => (reservationsByElement[childId]?.length || 0) > 0);
+                        const isPartiallyReserved = !isReservedToday && !hasFutureReservations && hasReservedChild;
 
                         return (
                             <div
@@ -571,24 +760,53 @@ export function VisualBookingAdmin() {
                                     "group transition-all duration-200 interactive-element",
                                     mode === 'select' ? "cursor-pointer hover:z-50" : "cursor-grab"
                                 )}
-                                onClick={(e) => handleElementClick(el, e)}
+                                onClick={(e) => {
+                                    if (el.customData?.isReservable !== false) {
+                                        handleElementClick(el, e);
+                                    }
+                                }}
                             >
                                 {/* THE SVG CONTENT */}
                                 <div
                                     dangerouslySetInnerHTML={{ __html: svgContent }}
                                     className="w-full h-full [&>svg]:w-full [&>svg]:h-full [&>svg]:overflow-visible pointer-events-none drop-shadow-sm"
                                     style={{
-                                        opacity: isReserved ? 0.6 : 1,
-                                        filter: isReserved ? 'grayscale(100%)' : 'none'
+                                        opacity: isReservedToday ? 0.5 : hasFutureReservations ? 0.8 : 1,
+                                        filter: isReservedToday ? 'grayscale(100%) blur(0.5px)' : hasFutureReservations ? 'grayscale(30%)' : 'none'
                                     }}
                                 />
 
-                                {/* RESERVED OVERLAY MARKER */}
-                                {isReserved && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-red-500/10 border-2 border-red-500 rounded-lg pointer-events-none">
-                                        <div className="bg-red-500 text-white rounded-full p-1 shadow-sm">
+                                {/* RESERVED TODAY MARKER (RED) */}
+                                {isReservedToday && !isRestrictMode && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-red-500/20 border-2 border-red-500 rounded-lg pointer-events-none shadow-[inset_0_0_15px_rgba(239,68,68,0.2)]">
+                                        <div className="bg-red-500 text-white rounded-full p-1 shadow-lg ring-2 ring-white">
                                             <Lock className="w-4 h-4" />
                                         </div>
+                                    </div>
+                                )}
+
+                                {/* FUTURE RESERVED MARKER (ORANGE) */}
+                                {hasFutureReservations && !isReservedToday && !isRestrictMode && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-orange-500/10 border-2 border-orange-400 rounded-lg pointer-events-none border-dashed">
+                                        <div className="bg-orange-400 text-white rounded-full p-1 shadow-md">
+                                            <CalendarIcon className="w-3.5 h-3.5" />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* FORBIDDEN MARKER (Restriction Mode) */}
+                                {isRestrictMode && (
+                                    <div className={cn(
+                                        "absolute inset-0 flex items-center justify-center rounded-lg pointer-events-none transition-all",
+                                        forbiddenPlaces.includes(el.id)
+                                            ? "bg-red-500/20 border-2 border-red-500"
+                                            : "border-2 border-transparent group-hover:border-amber-400 group-hover:bg-amber-400/10"
+                                    )}>
+                                        {forbiddenPlaces.includes(el.id) && (
+                                            <div className="bg-red-600 text-white rounded-full p-1 shadow-lg ring-2 ring-white">
+                                                <Ban className="w-4 h-4" />
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -602,21 +820,36 @@ export function VisualBookingAdmin() {
                                 )}
 
                                 {/* FREE HOVER MARKER (Only in select mode) */}
-                                {!isReserved && !isPartiallyReserved && mode === 'select' && (
+                                {!isReservedToday && !hasFutureReservations && !isPartiallyReserved && mode === 'select' && (
                                     <div className="absolute inset-0 border-2 border-transparent group-hover:border-green-500 rounded-lg pointer-events-none transition-colors" />
                                 )}
 
                                 {/* TOOLTIP */}
                                 <div
                                     className={cn(
-                                        "absolute -top-8 left-1/2 -translate-x-1/2 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity z-50 shadow-lg flex items-center gap-1",
-                                        isReserved ? "bg-red-600" : isPartiallyReserved ? "bg-orange-500" : "bg-black/80"
+                                        "absolute -top-10 left-1/2 -translate-x-1/2 text-white text-[10px] px-2 py-1.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity z-50 shadow-xl flex items-center gap-2 border border-white/20 backdrop-blur-md",
+                                        isReservedToday ? "bg-red-600/95" : hasFutureReservations ? "bg-orange-500/95" : isPartiallyReserved ? "bg-amber-500/90" : "bg-slate-900/90"
                                     )}
                                     style={{ transform: `translateX(-50%) scale(${1 / scale})`, transformOrigin: 'bottom center' }}
                                 >
-                                    {isReserved && <Lock className="w-3 h-3" />}
-                                    {isPartiallyReserved && <span className="text-[10px]">(Partiel)</span>}
-                                    <div className="font-bold">{el.customData.name}</div>
+                                    {isReservedToday ? <Lock className="w-3.5 h-3.5 animate-pulse" /> : hasFutureReservations ? <CalendarIcon className="w-3.5 h-3.5" /> : null}
+                                    <div className="flex flex-col leading-tight">
+                                        <div className="font-black flex items-center gap-1">
+                                            {el.customData.name}
+                                            {isReservedToday && <span className="text-[8px] bg-white/20 px-1 rounded">AUJOURD'HUI</span>}
+                                        </div>
+                                        {resList.length > 0 && (
+                                            <div className="mt-1 flex flex-col gap-0.5 border-t border-white/10 pt-1">
+                                                {resList.slice(0, 3).map(r => (
+                                                    <div key={r.id} className="text-[9px] font-medium flex justify-between gap-3 italic opacity-90">
+                                                        <span>{r.date.split('T')[0] === todayStr ? "Maintenant" : format(new Date(r.date), "dd/MM")}</span>
+                                                        <span>{r.time}</span>
+                                                    </div>
+                                                ))}
+                                                {resList.length > 3 && <div className="text-[8px] text-center opacity-70">+{resList.length - 3} autres...</div>}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );
@@ -636,9 +869,47 @@ export function VisualBookingAdmin() {
                         <div className="flex items-center gap-2">
                             <SheetTitle>Réserver {selectedElement?.customData?.name}</SheetTitle>
                             {selectedElement?.isReserved && (
-                                <span className="text-xs font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded">RÉSERVÉ</span>
+                                <span className="text-xs font-bold bg-amber-100 text-amber-600 px-2 py-0.5 rounded">DÉJÀ RÉSERVÉ</span>
                             )}
                         </div>
+                        {selectedElement?.reservations?.length > 0 && (
+                            <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-3">
+                                <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                                    <div className="size-2 bg-orange-500 rounded-full animate-pulse" />
+                                    <p className="font-extrabold text-slate-700 uppercase tracking-tight text-[10px]">Présence enregistrée ({selectedElement.reservations.length})</p>
+                                </div>
+                                {selectedElement.reservations.map((r: any) => (
+                                    <div key={r.id} className="flex justify-between items-center py-2.5 border-t border-slate-200 last:border-0 text-slate-600 hover:bg-slate-100/50 px-1 -mx-1 rounded-md transition-colors">
+                                        <div className="flex flex-col gap-0.5">
+                                            <div className="flex items-center gap-1.5 font-bold text-[11px] text-slate-800">
+                                                <User className="size-3 text-slate-400" />
+                                                <span>{r.customerName || "Anonyme"}</span>
+                                                <span className="text-[10px] font-normal text-slate-400">({r.customerPhone || "Pas de tel"})</span>
+                                            </div>
+                                            <div className="flex items-center gap-3 text-[10px] text-slate-500 font-medium ml-4">
+                                                <span className="flex items-center gap-1">
+                                                    <CalendarIcon className="size-2.5" />
+                                                    {format(new Date(r.date), "dd MMMM yyyy", { locale: undefined })}
+                                                </span>
+                                                <span className="flex items-center gap-1">
+                                                    <Clock className="size-2.5" />
+                                                    {r.time} - {r.exitTime?.split(' ')[1] || '...'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-100/50 rounded-full"
+                                            onClick={() => handleCancelSpecificReservation(r.id)}
+                                            title="Supprimer cette réservation"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         {selectedElement?.descendants?.length > 0 && !selectedElement?.isReserved && (
                             <SheetDescription className="text-orange-600 border-l-2 border-orange-400 pl-2 mt-1">
                                 Attention : Cette réservation inclura automatiquement {selectedElement.descendants.length} sous-élément(s).
@@ -647,75 +918,146 @@ export function VisualBookingAdmin() {
                         <SheetDescription>Détails de la réservation</SheetDescription>
                     </SheetHeader>
 
-                    <div className="grid gap-4 py-4">
-                        <div className="grid gap-2">
-                            <label htmlFor="name" className="text-sm font-medium">Nom du client</label>
-                            <Input
-                                id="name"
-                                value={formData.customerName}
-                                onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                                placeholder="Jean Dupont"
-                                disabled={selectedElement?.isReserved}
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <label htmlFor="phone" className="text-sm font-medium">Téléphone</label>
-                            <Input
-                                id="phone"
-                                value={formData.customerPhone}
-                                onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-                                placeholder="+261 34 ..."
-                                disabled={selectedElement?.isReserved}
-                            />
-                        </div>
+                    <div className="grid gap-5 py-6">
+                        {reservationFields.map((field) => {
+                            // Unified handling for all fields
+                            const isName = field.id === "customerName";
+                            const isPhone = field.id === "phone";
+
+                            const value = isName ? formData.customerName :
+                                isPhone ? formData.customerPhone :
+                                    formData.customFields[field.id] || "";
+
+                            const handleChange = (val: string) => {
+                                if (isName) setFormData({ ...formData, customerName: val });
+                                else if (isPhone) setFormData({ ...formData, customerPhone: val });
+                                else setFormData({
+                                    ...formData,
+                                    customFields: { ...formData.customFields, [field.id]: val }
+                                });
+                            };
+
+                            return (
+                                <div key={field.id} className="grid gap-2">
+                                    <div className="flex items-center justify-between">
+                                        <label htmlFor={field.id} className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                            {field.name}
+                                        </label>
+                                        {field.isRequired && (
+                                            <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">OBLIGATOIRE</span>
+                                        )}
+                                    </div>
+                                    <div className="relative group">
+                                        <Input
+                                            id={field.id}
+                                            type={field.type === "number" ? "number" : "text"}
+                                            value={value}
+                                            onChange={(e) => handleChange(e.target.value)}
+                                            placeholder={`Saisir ${field.name.toLowerCase()}...`}
+                                            className={cn(
+                                                "h-10 bg-muted/30 border-border/50 focus:bg-background transition-all",
+                                                field.isRequired && !value && "border-red-200"
+                                            )}
+                                        />
+                                        {field.type === "phone" && (
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                                                <Phone className="size-4" />
+                                            </div>
+                                        )}
+                                        {field.isRequired && !value && (
+                                            <div className="absolute -bottom-4 right-0 text-[9px] text-red-500 font-bold animate-pulse">
+                                                Ce champ est requis
+                                            </div>
+                                        )}
+                                    </div>
+                                    {/* Explicitly skip OTP for admins as requested */}
+                                    {field.type === "phone" && field.isConfirmationRequired && (
+                                        <p className="text-[10px] text-emerald-600 font-medium flex items-center gap-1 mt-1">
+                                            <Check className="size-3" /> Mode Admin : OTP ignoré
+                                        </p>
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        <div className="h-px bg-border my-2" />
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
-                                <label className="text-sm font-medium">Date</label>
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Date de passage</label>
                                 <Input
                                     type="date"
                                     value={format(formData.date, "yyyy-MM-dd")}
                                     onChange={(e) => setFormData({ ...formData, date: new Date(e.target.value) })}
-                                    disabled={selectedElement?.isReserved}
+                                    className="h-10 bg-muted/30 border-border/50"
                                 />
                             </div>
                             <div className="grid gap-2">
-                                <label className="text-sm font-medium">Heure</label>
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Heure prévue</label>
                                 <Input
                                     type="time"
                                     value={formData.time}
                                     onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                                    disabled={selectedElement?.isReserved}
+                                    className="h-10 bg-muted/30 border-border/50"
                                 />
                             </div>
                         </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Offre</label>
+                                <Select
+                                    value={formData.offer}
+                                    onValueChange={(val) => setFormData({ ...formData, offer: val })}
+                                >
+                                    <SelectTrigger className="h-10 bg-muted/30 border-border/50">
+                                        <SelectValue placeholder="Choisir une offre" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {pricingPolicies.map((p: string) => (
+                                            <SelectItem key={p} value={p}>
+                                                {getPricingPolicyLabel(p)}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            {formData.offer === "free" && (
+                                <div className="grid gap-2">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Heure de fin (Libre)</label>
+                                    <Input
+                                        type="time"
+                                        value={formData.exitTimeFree}
+                                        onChange={(e) => setFormData({ ...formData, exitTimeFree: e.target.value })}
+                                        className="h-10 bg-muted/30 border-border/50"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
                         <div className="grid gap-2">
-                            <label htmlFor="notes" className="text-sm font-medium">Notes</label>
+                            <label htmlFor="notes" className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Notes & Commentaires</label>
                             <Input
                                 id="notes"
                                 value={formData.notes}
                                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                placeholder="Demandes spéciales..."
+                                placeholder="Demandes spéciales (ex: à côté de la fenêtre)..."
                                 disabled={selectedElement?.isReserved}
+                                className="h-10 bg-muted/30 border-border/50"
                             />
                         </div>
                     </div>
 
-                    <SheetFooter className="gap-2 sm:gap-0">
-                        {selectedElement?.isReserved ? (
-                            <Button variant="destructive" onClick={handleCancelReservation} className="w-full">
-                                Libérer la place
-                            </Button>
-                        ) : (
-                            <div className="flex gap-2 w-full justify-end">
-                                <SheetClose asChild>
-                                    <Button variant="outline">Annuler</Button>
-                                </SheetClose>
-                                <Button onClick={handleSaveReservation} disabled={selectedElement?.isReserved}>Confirmer</Button>
-                            </div>
-                        )}
+                    <SheetFooter>
+                        <div className="flex gap-2 w-full justify-end">
+                            <SheetClose asChild>
+                                <Button variant="outline">Annuler</Button>
+                            </SheetClose>
+                            <Button onClick={handleSaveReservation}>Confirmer la réservation</Button>
+                        </div>
                     </SheetFooter>
                 </SheetContent>
             </Sheet>
-        </div>
+        </div >
     );
 }

@@ -5,8 +5,9 @@ import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { MainContent } from "@/components/dashboard/main-content";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { Suspense } from "react";
 
-export default function DashboardPage() {
+function DashboardContent() {
   const searchParams = useSearchParams();
   const view = searchParams.get("view");
   const isExcalidrawView = view === "plan";
@@ -16,14 +17,25 @@ export default function DashboardPage() {
   }
 
   return (
-    <SidebarProvider className="bg-sidebar">
+    <SidebarProvider className="bg-sidebar h-screen overflow-hidden">
       <DashboardSidebar />
-      <div className="h-svh overflow-hidden lg:p-2 w-full">
-        <div className="lg:border lg:rounded-md overflow-hidden flex flex-col items-stretch justify-start bg-container h-full w-full bg-background">
-          {view !== "bookmarks" && view !== "clients" && view !== "tasks" && <DashboardHeader />}
+      <div className="flex flex-col flex-1 h-full overflow-hidden bg-background">
+        <DashboardHeader />
+        <main className="flex-1 overflow-hidden relative">
           <MainContent />
-        </div>
+        </main>
       </div>
     </SidebarProvider>
+  );
+
+}
+
+
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }

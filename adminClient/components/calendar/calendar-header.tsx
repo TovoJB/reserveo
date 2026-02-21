@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCalendarStore } from "@/store/calendar-store";
-import { getTodayEvents } from "@/mock-data/events";
+
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
@@ -30,13 +30,8 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export function CalendarHeader() {
   const { currentWeekStart } = useCalendarStore();
-  const todayEvents = getTodayEvents();
-  const meetingsCount = todayEvents.filter(
-    (e) =>
-      e.title.toLowerCase().includes("call") ||
-      e.title.toLowerCase().includes("meeting")
-  ).length;
-  const eventsCount = todayEvents.length - meetingsCount;
+  const meetingsCount = 0;
+  const eventsCount = 0;
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   return (
@@ -55,9 +50,7 @@ export function CalendarHeader() {
                   {format(currentWeekStart, "MMMM dd, yyyy")}
                 </h1>
                 <p className="hidden md:block text-xs text-muted-foreground">
-                  You have {meetingsCount} meeting
-                  {meetingsCount !== 1 ? "s" : ""} and {eventsCount} event
-                  {eventsCount !== 1 ? "s" : ""} today 🗓️
+                  {meetingsCount} meetings and {eventsCount} events today 🗓️
                 </p>
               </div>
             </div>
