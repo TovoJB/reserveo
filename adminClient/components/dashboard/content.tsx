@@ -2,11 +2,10 @@
 
 import { WelcomeSection } from "./header";
 import { StatsCards } from "./stats-cards";
-import { LeadsChart } from "./leads-chart";
-//import { TopPerformers } from "./top-performers";
-import { LeadsTable } from "./leads-table";
-import { RevenueFlowChart } from "./revenue-flow-chart";
 import { LeadSourcesChart } from "./lead-sources-chart";
+import { RevenueFlowChart } from "./revenue-flow-chart";
+import { TasksTable } from "./tasks-table";
+import { TeamsActivityTable } from "./teams-activity-table";
 
 export function DashboardContent() {
   return (
@@ -14,12 +13,13 @@ export function DashboardContent() {
       <WelcomeSection />
       <StatsCards />
       <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
-        {/* <LeadsChart /> */}
         <LeadSourcesChart />
         <RevenueFlowChart />
-        {/* <TopPerformers /> */}
       </div>
-      <LeadsTable />
+
+      <TeamsActivityTable />
+
+
     </main>
   );
 }

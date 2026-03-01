@@ -299,7 +299,7 @@ export function ClientsImportView() {
                             <Button variant="outline" className="h-11 px-8" onClick={() => setStep(1)}>
                                 Nouveau Formulaire
                             </Button>
-                            <Button className="h-11 px-8 bg-primary text-primary-foreground" onClick={() => window.location.href = '/?view=clients'}>
+                            <Button className="h-11 px-8 bg-primary text-primary-foreground" onClick={() => window.location.href = '/dashboard?view=clients'}>
                                 Voir mes Clients
                             </Button>
                         </div>

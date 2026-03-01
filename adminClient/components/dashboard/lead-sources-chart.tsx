@@ -25,31 +25,31 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from "recharts";
 
 const allData = {
   "7days": [
-    { name: "reset", value: 312, color: "#35b9e9" },
-    { name: "not confirmed", value: 198, color: "#6e3ff3" },
-    { name: "reserved", value: 156, color: "#375dfb" },
-    { name: "vacant", value: 98, color: "#e255f2" },
+    { name: "Libre", value: 312, color: "#35b9e9" },
+    { name: "En attente", value: 198, color: "#6e3ff3" },
+    { name: "Confirmé", value: 156, color: "#375dfb" },
+    { name: "Indisponible", value: 98, color: "#e255f2" },
   ],
   "30days": [
-    { name: "reset", value: 1445, color: "#35b9e9" },
-    { name: "not confirmed", value: 903, color: "#6e3ff3" },
-    { name: "reserved", value: 722, color: "#375dfb" },
-    { name: "vacant", value: 451, color: "#e255f2" },
+    { name: "Libre", value: 1445, color: "#35b9e9" },
+    { name: "En attente", value: 903, color: "#6e3ff3" },
+    { name: "Confirmé", value: 722, color: "#375dfb" },
+    { name: "Indisponible", value: 451, color: "#e255f2" },
   ],
   "90days": [
-    { name: "reset", value: 4235, color: "#35b9e9" },
-    { name: "not confirmed", value: 2709, color: "#6e3ff3" },
-    { name: "reserved", value: 2166, color: "#375dfb" },
-    { name: "vacant", value: 1353, color: "#e255f2" },
+    { name: "Libre", value: 4235, color: "#35b9e9" },
+    { name: "En attente", value: 2709, color: "#6e3ff3" },
+    { name: "Confirmé", value: 2166, color: "#375dfb" },
+    { name: "Indisponible", value: 1353, color: "#e255f2" },
   ],
 };
 
 type TimeRange = "7days" | "30days" | "90days";
 
 const timeRangeLabels: Record<TimeRange, string> = {
-  "7days": "Last 7 days",
-  "30days": "Last 30 days",
-  "90days": "Last 90 days",
+  "7days": "7 derniers jours",
+  "30days": "30 derniers jours",
+  "90days": "90 derniers jours",
 };
 
 export function LeadSourcesChart() {
@@ -102,7 +102,7 @@ export function LeadSourcesChart() {
           <Button variant="outline" size="icon" className="size-7 sm:size-8">
             <ChartLine className="size-4 sm:size-[18px] text-muted-foreground" />
           </Button>
-          <span className="text-sm sm:text-base font-medium">Lead Sources</span>
+          <span className="text-sm sm:text-base font-medium">Proportion des Places</span>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -111,7 +111,7 @@ export function LeadSourcesChart() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[180px]">
-            <DropdownMenuLabel>Time Range</DropdownMenuLabel>
+            <DropdownMenuLabel>Période</DropdownMenuLabel>
             {(Object.keys(timeRangeLabels) as TimeRange[]).map((range) => (
               <DropdownMenuCheckboxItem
                 key={range}
@@ -122,29 +122,29 @@ export function LeadSourcesChart() {
               </DropdownMenuCheckboxItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>Display Options</DropdownMenuLabel>
+            <DropdownMenuLabel>Options d&apos;affichage</DropdownMenuLabel>
             <DropdownMenuCheckboxItem
               checked={showLabels}
               onCheckedChange={setShowLabels}
             >
-              Show labels
+              Afficher les labels
             </DropdownMenuCheckboxItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
               <Download className="size-4 mr-2" />
-              Export as PNG
+              Exporter en PNG
             </DropdownMenuItem>
             <DropdownMenuItem>
               <Share2 className="size-4 mr-2" />
-              Share
+              Partager
             </DropdownMenuItem>
             <DropdownMenuItem>
               <Maximize2 className="size-4 mr-2" />
-              Full Screen
+              Plein écran
             </DropdownMenuItem>
             <DropdownMenuItem>
               <RefreshCw className="size-4 mr-2" />
-              Refresh Data
+              Actualiser les données
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -179,7 +179,7 @@ export function LeadSourcesChart() {
               {totalLeads.toLocaleString()}
             </span>
             <span className="text-[10px] sm:text-xs text-muted-foreground">
-              Total Leads
+              Total Places
             </span>
           </div>
         </div>

@@ -63,6 +63,7 @@ import { fr } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Trash2, Eye, UserCheck, ShieldAlert, Zap } from "lucide-react";
 import { useClientStore } from "@/store/client-store";
+import type { ClientRestriction, ClientRestrictionDetails, RestrictionRule } from "@/mock-data/dashboard";
 import { useBookingStore, Reservation as StoreReservation } from "@/store/booking-store";
 import { useTypesStore, getPricingPolicyLabel } from "@/store/types-store";
 import {
@@ -76,8 +77,8 @@ import {
   useReservations,
   useUpdateReservationStatus,
   useDeleteReservation,
-  type Reservation as BackendReservation,
 } from "@/hooks/use-reservations";
+import { Reservation as BackendReservation } from "@/types";
 
 // Simulated localized Booking types
 export type BookingStatus = "confirmed" | "pending" | "cancelled";
@@ -96,7 +97,7 @@ export interface Booking {
   eventName: string;
   details?: string;
   createdAt: string;
-  backendId?: number;
+  backendId?: number | string;
 }
 
 // Map backend status → local status
@@ -108,7 +109,8 @@ function mapStatus(s: BackendReservation["status"]): BookingStatus {
 
 // Map backend reservation → local Booking
 function mapReservation(r: BackendReservation): Booking {
-  const date = r.startDate ? r.startDate.split("T")[0] : "2026-01-01";
+  // Ensure date is only YYYY-MM-DD
+  const date = r.startDate ? r.startDate.substring(0, 10) : "2026-01-01";
   const entry = r.startTime ? `${date} ${r.startTime}` : `${date} 00:00`;
   const exit = r.endTime ? `${date} ${r.endTime}` : `${date} 23:59`;
   return {
@@ -234,6 +236,41 @@ function BookingStatusBadge({
   );
 }
 
+function getRestrictionDetails(r: ClientRestriction): ClientRestrictionDetails {
+  if (r === "none" || r === "all") return { rules: [], forbiddenPlaces: [] };
+  if (Array.isArray((r as ClientRestrictionDetails).rules)) {
+    return r as ClientRestrictionDetails;
+  }
+  return {
+    rules: (r as any)?.rules ?? [],
+    forbiddenPlaces: (r as any)?.forbiddenPlaces ?? [],
+  };
+}
+
+function computeBookingQuota(restriction: ClientRestriction, bookingCount: number) {
+  const details = getRestrictionDetails(restriction);
+
+  const limitedRules = details.rules.filter(
+    (rule: RestrictionRule) => rule.operator === "max" || rule.operator === "equal"
+  );
+
+  if (!limitedRules.length) {
+    return { current: bookingCount, max: null as number | null };
+  }
+
+  const max = limitedRules.reduce(
+    (acc, rule) => Math.max(acc, rule.value ?? 0),
+    0
+  );
+
+  if (!max || max <= 0) {
+    return { current: bookingCount, max: null as number | null };
+  }
+
+  const current = Math.min(bookingCount, max);
+  return { current, max };
+}
+
 export function TasksTable() {
   const { clients } = useClientStore();
 
@@ -273,13 +310,13 @@ export function TasksTable() {
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
   const filteredAndSortedBookings = useMemo(() => {
     const result = bookings.filter((b) => {
       const bDate = parseISO(b.entryTime.replace(" ", "T"));
-      const isSameDate = isSameDay(bDate, selectedDate);
+      const isSameDate = !selectedDate || isSameDay(bDate, selectedDate);
       const matchesSearch = b.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         b.space.toLowerCase().includes(searchQuery.toLowerCase()) ||
         b.eventName.toLowerCase().includes(searchQuery.toLowerCase());
@@ -303,7 +340,14 @@ export function TasksTable() {
 
   // Dates with bookings for calendar markers
   const datesWithBookings = useMemo(() => {
-    return bookings.map(b => parseISO(b.entryTime.replace(" ", "T")));
+    // Collect unique dates (normalized to midnight)
+    const uniqueDates = new Set<string>();
+    bookings.forEach(b => {
+      const d = parseISO(b.entryTime.replace(" ", "T"));
+      const normalized = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString();
+      uniqueDates.add(normalized);
+    });
+    return Array.from(uniqueDates).map(d => new Date(d));
   }, [bookings]);
 
 
@@ -324,7 +368,7 @@ export function TasksTable() {
   const toggleStatus = (id: string, s: BookingStatus) => {
     const booking = bookings.find(b => b.id === id);
     if (booking?.backendId) {
-      updateStatusMutation.mutate({ id: booking.backendId, status: toBackendStatus(s) });
+      updateStatusMutation.mutate({ id: Number(booking.backendId), status: toBackendStatus(s) });
     } else {
       setLocalBookings(prev => prev.map(b => b.id === id ? { ...b, status: s } : b));
     }
@@ -334,7 +378,7 @@ export function TasksTable() {
     if (confirm("Supprimer cette réservation ?")) {
       const booking = bookings.find(b => b.id === id);
       if (booking?.backendId) {
-        deleteMutation.mutate(booking.backendId);
+        deleteMutation.mutate(Number(booking.backendId));
       } else {
         setLocalBookings(prev => prev.filter(b => b.id !== id));
       }
@@ -403,20 +447,52 @@ export function TasksTable() {
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-1.5 bg-muted/50 border-border/50">
                 <Calendar className="size-3.5" />
-                <span>{selectedDate ? format(selectedDate, "PPP", { locale: fr }) : "Choisir date"}</span>
+                <span>{selectedDate ? format(selectedDate, "PPP", { locale: fr }) : "Toutes les dates"}</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
-              <CalendarUI
-                mode="single"
-                selected={selectedDate}
-                onSelect={(d) => d && setSelectedDate(d)}
-                initialFocus
-                modifiers={{ hasBooking: datesWithBookings }}
-                modifiersStyles={{
-                  hasBooking: { fontWeight: 'bold', border: '1px solid var(--primary)', borderRadius: '50%' }
-                }}
-              />
+              <div className="flex flex-col">
+                <CalendarUI
+                  mode="single"
+                  selected={selectedDate || undefined}
+                  onSelect={(d) => setSelectedDate(d || null)}
+                  initialFocus
+                  modifiers={{ hasBooking: datesWithBookings }}
+                  modifiersClassNames={{
+                    hasBooking: "has-booking-marker"
+                  }}
+                />
+                <style jsx global>{`
+                  .has-booking-marker {
+                    position: relative;
+                    font-weight: bold;
+                  }
+                  .has-booking-marker::after {
+                    content: '';
+                    position: absolute;
+                    bottom: 4px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    width: 4px;
+                    height: 4px;
+                    border-radius: 9999px;
+                    background-color: #3b82f6; /* blue-500 */
+                    z-index: 10;
+                  }
+                  [data-selected-single="true"].has-booking-marker::after {
+                    background-color: white;
+                  }
+                `}</style>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full rounded-none border-t text-xs h-10 font-medium hover:bg-muted/80"
+                  onClick={() => setSelectedDate(null)}
+                >
+                  <RefreshCw className="size-3 mr-2" />
+                  Afficher toutes les réservations
+                </Button>
+              </div>
             </PopoverContent>
           </Popover>
           <div className="h-8 w-px bg-border mx-1 hidden sm:block" />
@@ -441,9 +517,31 @@ export function TasksTable() {
           <TableBody>
             {paginatedBookings.map((booking) => {
               const clientMatch = clients.find(c => c.email === booking.email);
-              const isBanned = clientMatch?.status === "banned";
-              const isSubscribed = clientMatch?.status === "subscribed" || clientMatch?.status === "active";
+              const isBanned = clientMatch?.status === "BANNED";
+              const isSubscribed = clientMatch?.status === "SUBSCRIBED" || clientMatch?.status === "ACTIVE";
               const effectiveStatus = isBanned ? "cancelled" : booking.status;
+
+              // Calcul dynamique du quota: nombre de réservations qui se chevauchent pour ce client
+              let quota = null as { current: number; max: number | null } | null;
+              if (clientMatch) {
+                const clientRestriction = clientMatch.restrictions as ClientRestriction;
+
+                const entry = parseISO(booking.entryTime.replace(" ", "T"));
+                const exit = parseISO(booking.exitTime.replace(" ", "T"));
+
+                const currentUsage = bookings.filter((b) => {
+                  if (b.email !== booking.email) return false;
+                  const bEntry = parseISO(b.entryTime.replace(" ", "T"));
+                  const bExit = parseISO(b.exitTime.replace(" ", "T"));
+                  // Même jour
+                  if (!isSameDay(entry, bEntry)) return false;
+                  // Chevauchement des créneaux
+                  const overlaps = bEntry < exit && entry < bExit;
+                  return overlaps;
+                }).length;
+
+                quota = computeBookingQuota(clientRestriction, currentUsage);
+              }
 
               return (
                 <TableRow key={booking.id} className="border-border/50 group">
@@ -466,6 +564,19 @@ export function TasksTable() {
                           {isSubscribed && <span title="Membre (Auto-confirmation active)"><Zap className="size-3 text-amber-500 fill-amber-500" /></span>}
                         </div>
                         <span className="text-[10px] text-muted-foreground font-medium">{booking.email}</span>
+                        {quota && quota.max && (
+                          <div className="mt-1 w-32">
+                            <div className="w-full bg-muted/60 rounded-full h-1 overflow-hidden">
+                              <div
+                                className="h-full bg-emerald-500 rounded-full"
+                                style={{ width: `${(quota.current / quota.max) * 100}%` }}
+                              />
+                            </div>
+                            <div className="flex justify-between text-[9px] text-muted-foreground">
+                              <span>{quota.current} / {quota.max}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </TableCell>

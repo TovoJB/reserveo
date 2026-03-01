@@ -11,7 +11,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   BarChart3,
   Sparkles,
@@ -33,12 +34,50 @@ import {
   MousePointerClick,
   CheckSquare,
   Database,
+  AlertCircle
 } from "lucide-react";
 import Link from "next/link";
 
+import { useDashboardStore } from "@/store/dashboard-store";
+import { Badge } from "@/components/ui/badge";
+import { useAccountSync } from "@/hooks/use-account-sync";
+import { useWorkgroupStore } from "@/store/workgroup-store";
+import { NotificationDropdown } from "./notification-dropdown";
+
 export function DashboardHeader() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const view = searchParams?.get("view");
+  const { workspaceType } = useDashboardStore();
+  const { me, refetch } = useAccountSync();
+  const { groups } = useWorkgroupStore();
+
+  const [hasDraftProfile, setHasDraftProfile] = useState(false);
+
+  useEffect(() => {
+    // Check if there is a draft stored in DB.
+    if (!me?.onboardingData) {
+      setHasDraftProfile(false);
+      return;
+    }
+
+    try {
+      const parsed = typeof me.onboardingData === 'string' ? JSON.parse(me.onboardingData) : me.onboardingData;
+      setHasDraftProfile(parsed?.isComplete === false);
+    } catch (e) {
+      setHasDraftProfile(false);
+    }
+  }, [me]);
+
+  useEffect(() => {
+    const handleDraftUpdate = () => {
+      if (refetch) refetch();
+    };
+    window.addEventListener("profileDraftUpdated", handleDraftUpdate);
+    return () => {
+      window.removeEventListener("profileDraftUpdated", handleDraftUpdate);
+    };
+  }, [refetch]);
 
   const getHeaderTitle = () => {
     switch (view) {
@@ -53,6 +92,8 @@ export function DashboardHeader() {
       case "profile": return "Profil";
       case "teams": return "Equipes";
       case "clients-import": return "Sync Google Forms";
+      case "organization": return "Organisation";
+      case "organization-setup": return "Configuration Initiale";
       default: return "Dashboard";
     }
   };
@@ -70,6 +111,8 @@ export function DashboardHeader() {
       case "profile": return <Building className="size-4" />;
       case "teams": return <Users className="size-4" />;
       case "clients-import": return <Database className="size-4" />;
+      case "organization": return <Globe className="size-4" />;
+      case "organization-setup": return <Sparkles className="size-4" />;
       default: return <BarChart3 className="size-4" />;
     }
   };
@@ -81,6 +124,39 @@ export function DashboardHeader() {
         <div className="hidden sm:flex items-center gap-2 text-muted-foreground">
           {getHeaderIcon()}
           <span className="text-sm font-medium">{getHeaderTitle()}</span>
+          {hasDraftProfile && (
+            <span className="relative flex size-2 ml-1" aria-label="Profil incomplet">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-orange-500 opacity-75 animate-ping" />
+              <span className="relative inline-flex size-2 rounded-full bg-orange-600" />
+            </span>
+          )}
+          {workspaceType && (
+            <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary border-primary/20 text-[10px] font-bold uppercase tracking-widest">
+              {workspaceType === "fixed" ? "Établissement" : "Événement"}
+            </Badge>
+          )}
+          {hasDraftProfile && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/dashboard?view=profile")}
+              className="ml-4 h-7 border-orange-500/50 bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 hover:text-orange-700 font-medium"
+            >
+              <AlertCircle className="size-3.5 mr-1.5" />
+              Reprendre le profil
+            </Button>
+          )}
+          {groups.length === 0 && view !== "organization-setup" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/dashboard?view=organization-setup")}
+              className="ml-4 h-7 border-blue-500/50 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 hover:text-blue-700 font-medium"
+            >
+              <Sparkles className="size-3.5 mr-1.5" />
+              Initialiser mon organisation
+            </Button>
+          )}
         </div>
       </div>
 
@@ -188,6 +264,7 @@ export function DashboardHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
 
+        <NotificationDropdown />
         <ThemeToggle />
 
         <Button variant="ghost" size="icon" asChild className="hidden sm:flex">
@@ -209,25 +286,11 @@ export function WelcomeSection() {
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">
-          Welcome Back LN!
+          Bonjour LN!
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Let&apos;s tackle down some work
+          Voici le récapitulatif de vos réservations aujourd&apos;hui.
         </p>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          className="h-9 gap-1.5 bg-card hover:bg-card/80 border-border/50"
-        >
-          <FilePlus className="size-4" />
-          <span className="hidden sm:inline">Add Project</span>
-        </Button>
-        <Button className="h-9 gap-1.5 bg-neutral-800 hover:bg-neutral-700 text-white border border-border/50">
-          <UserPlus className="size-4" />
-          <span className="hidden sm:inline">New Client</span>
-        </Button>
       </div>
     </div>
   );

@@ -10,6 +10,8 @@ export type WorkgroupItem = {
     type?: 'folder' | 'file';
     children?: WorkgroupItem[];
     floorId?: string; // ID for localStorage/Excalidraw
+    hasWarning?: boolean;
+    warningMessage?: string;
 };
 
 interface WorkgroupState {
@@ -25,26 +27,8 @@ interface WorkgroupState {
 export const useWorkgroupStore = create<WorkgroupState>()(
     persist(
         (set) => ({
-            groups: [
-                {
-                    id: "Evenements",
-                    name: "Evenements",
-                    icon: "Globe",
-                    type: 'folder',
-                    children: [
-                        {
-                            id: "default-event",
-                            name: "Événement par défaut",
-                            icon: "Folder",
-                            type: 'folder',
-                            children: [
-                                { id: "default-plan", name: "Etage 1", icon: "File", type: 'file', floorId: "default-plan" }
-                            ]
-                        }
-                    ],
-                },
-            ],
-            expandedItems: ["Evenements", "default-event"],
+            groups: [],
+            expandedItems: [],
             setGroups: (groups) => set({ groups }),
             setExpandedItems: (expandedItems) => set({ expandedItems }),
             toggleItem: (id) => set((state) => ({

@@ -13,28 +13,28 @@ import { cn } from "@/lib/utils";
 
 const stats = [
   {
-    title: "Generated Revenue",
+    title: "Revenu Total",
     value: dashboardStats.generatedRevenue.value,
     change: dashboardStats.generatedRevenue.change,
     icon: DollarSign,
     trend: "up" as const,
   },
   {
-    title: "event created",
+    title: "Réservations",
     value: dashboardStats.signedClients.value,
     change: dashboardStats.signedClients.change,
     icon: Users,
-    trend: "down" as const,
+    trend: "up" as const,
   },
   {
-    title: "Total Leads",
+    title: "Clients Actifs",
     value: dashboardStats.totalLeads.value,
     change: dashboardStats.totalLeads.change,
     icon: MessageSquare,
     trend: "up" as const,
   },
   {
-    title: "Team Members",
+    title: "Personnel en service",
     value: dashboardStats.teamMembers.value,
     extra: { active: dashboardStats.teamMembers.activeCount },
     icon: Building,

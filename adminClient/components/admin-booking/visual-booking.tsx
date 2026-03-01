@@ -23,7 +23,10 @@ import {
     Map,
     ArrowLeft,
     Ban,
-    Trash2
+    Trash2,
+    Loader2,
+    FileText,
+    LayoutGrid
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -68,10 +71,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { ClientRestrictionDetails } from "@/mock-data/dashboard";
+import { useApi } from "@/hooks/use-api";
+import { useAuth } from "@clerk/nextjs";
 
 export function VisualBookingAdmin() {
     const searchParams = useSearchParams();
     const router = useRouter();
+    const api = useApi();
+    const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
+    // Keep a ref to the api so loadData doesn't re-create when api instance changes
+    const apiRef = useRef(api);
+    useEffect(() => { apiRef.current = api; }, [api]);
     const { groups } = useWorkgroupStore();
     const { reservations: storeReservations, addReservation, removeReservation, removeReservationById } = useBookingStore();
     const { reservationFields, openingHours, pricingPolicies } = useTypesStore();
@@ -206,32 +216,93 @@ export function VisualBookingAdmin() {
         };
     }, []);
 
-    // Load Data
+    // Proxy: reconstruct Firebase file URLs through the public backend proxy
+    const reconstructFiles = useCallback(async (files: any) => {
+        if (!files) return {};
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+        const reconstructed: any = {};
+
+        await Promise.all(Object.entries(files).map(async ([id, info]: [string, any]) => {
+            if (info.firebaseUrl && !info.dataURL) {
+                try {
+                    const proxyUrl = `${API_BASE}/public/space-plans/proxy-asset?url=${encodeURIComponent(info.firebaseUrl)}`;
+                    const response = await fetch(proxyUrl);
+                    if (!response.ok) throw new Error(`Proxy ${response.status}`);
+                    const blob = await response.blob();
+                    const dataURL = await new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result as string);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(blob);
+                    });
+                    reconstructed[id] = { ...info, id, dataURL };
+                } catch (e) {
+                    console.warn(`[VisualBooking] Could not load file ${id}:`, e);
+                    reconstructed[id] = { ...info, id };
+                }
+            } else {
+                reconstructed[id] = { ...info, id };
+            }
+        }));
+        return reconstructed;
+    }, []);
+
+    // Load Data — priority: API backend → localStorage fallback
     const loadData = useCallback(async () => {
+        // Wait for Clerk auth to be ready before making authenticated API calls
+        if (!isAuthLoaded || !isSignedIn) {
+            console.log('[VisualBooking] Auth not ready yet, skipping load');
+            return;
+        }
+
         setIsLoading(true);
+        const spaceId = parseInt(floorId);
+        console.log('[VisualBooking] loadData called — floorId:', floorId, 'spaceId:', spaceId);
         try {
+            // 1. Try loading from the backend API (source of truth after ENREGISTRER)
+            if (!isNaN(spaceId)) {
+                try {
+                    const { data } = await apiRef.current.get<{ data: any }>(`/space-plans/${spaceId}`);
+                    const plan = data?.data?.planData || data?.data;
+                    console.log('[VisualBooking] API response:', { elementsCount: plan?.elements?.length, filesCount: Object.keys(plan?.files || {}).length });
+                    if (plan && (plan.elements?.length > 0)) {
+                        const reconstructedFiles = await reconstructFiles(plan.files);
+                        setElements(plan.elements || []);
+                        setAppState(plan.appState || {});
+                        setFiles(reconstructedFiles || {});
+                        console.log('[VisualBooking] Loaded from API ✅', plan.elements.length, 'elements');
+                        return;
+                    } else {
+                        console.warn('[VisualBooking] API returned empty plan, falling back to localStorage');
+                    }
+                } catch (apiErr: any) {
+                    console.warn('[VisualBooking] API error:', apiErr?.message);
+                }
+            } else {
+                console.warn('[VisualBooking] floorId is not numeric:', floorId, '— skipping API call');
+            }
+
+            // 2. Fallback: localStorage (live edits not yet saved)
             const stored = localStorage.getItem(`reserveo-floor-${floorId}`);
+            console.log('[VisualBooking] localStorage key:', `reserveo-floor-${floorId}`, '— found:', !!stored);
             if (stored) {
                 const parsed = JSON.parse(stored);
                 setElements(parsed.elements || []);
                 setAppState(parsed.appState || {});
                 setFiles(parsed.files || {});
-            } else if (floorId === "default-plan") {
-                const res = await fetch('/data/florplan1.excalidraw');
-                const data = await res.json();
-                setElements(data.elements || []);
-                setAppState(data.appState || {});
-                setFiles(data.files || []);
-                localStorage.setItem(`reserveo-floor-${floorId}`, JSON.stringify(data));
-            } else {
-                setElements([]);
+                return;
             }
+
+            setElements([]);
+            setAppState({});
+            setFiles({});
         } catch (error) {
             console.error("Failed to load floor data:", error);
         } finally {
             setIsLoading(false);
         }
-    }, [floorId]);
+        // Note: apiRef is excluded intentionally — it's a ref that always holds the latest api
+    }, [floorId, isAuthLoaded, isSignedIn, reconstructFiles]);
 
     useEffect(() => {
         loadData();
@@ -613,7 +684,69 @@ export function VisualBookingAdmin() {
     }
 
     if (isLoading) {
-        return <div className="flex items-center justify-center h-full">Chargement du plan...</div>;
+        return (
+            <div className="flex flex-col items-center justify-center h-full gap-4 bg-gray-50/50">
+                <Loader2 className="size-10 animate-spin text-blue-600" />
+                <p className="text-sm font-medium text-muted-foreground italic">Chargement du plan de salle...</p>
+            </div>
+        );
+    }
+
+    if (allFloorPlans.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full gap-6 bg-gray-50/50 p-8 text-center">
+                <div className="size-20 bg-blue-50 rounded-full flex items-center justify-center">
+                    <Map className="size-10 text-blue-400" />
+                </div>
+                <div className="max-w-md space-y-2">
+                    <h2 className="text-xl font-bold text-slate-800">Aucun plan disponible</h2>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                        Vous n'avez pas encore créé de plan de salle. Utilisez la barre latérale pour ajouter un nouveau plan Excalidraw dans un dossier d'événement.
+                    </p>
+                </div>
+                <Button onClick={() => router.push('/dashboard')}>
+                    Retour au Dashboard
+                </Button>
+            </div>
+        );
+    }
+
+    if (elements.length === 0 && !isLoading) {
+        return (
+            <div className="flex flex-col h-full w-full bg-gray-50/50 overflow-hidden">
+                <div className="flex items-center justify-between px-6 py-4 bg-white border-b z-20 shadow-sm shrink-0">
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-lg font-bold">Réservation Visuelle</h1>
+                        <Select value={selectedFloorId} onValueChange={setSelectedFloorId}>
+                            <SelectTrigger className="w-[180px] h-8 text-xs font-medium">
+                                <SelectValue placeholder="Choisir un plan" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {allFloorPlans.map(plan => (
+                                    <SelectItem key={plan.id} value={plan.id} className="text-xs">
+                                        {plan.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <div className="flex-1 flex flex-col items-center justify-center gap-6 p-8 text-center">
+                    <div className="size-20 bg-amber-50 rounded-full flex items-center justify-center">
+                        <FileText className="size-10 text-amber-400" />
+                    </div>
+                    <div className="max-w-md space-y-2">
+                        <h2 className="text-xl font-bold text-slate-800">Plan vide ou non initialisé</h2>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                            Ce plan ne contient aucun élément graphique. Allez dans l'éditeur pour dessiner votre plan de salle.
+                        </p>
+                    </div>
+                    <Button variant="outline" onClick={() => router.push(`/dashboard?view=plan&id=${allFloorPlans.find(p => p.id === selectedFloorId)?.id || selectedFloorId}`)}>
+                        Ouvrir l'éditeur de plan
+                    </Button>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -698,7 +831,7 @@ export function VisualBookingAdmin() {
                             variant="secondary"
                             size="sm"
                             className="h-8 font-bold text-[10px] gap-2 shadow-sm"
-                            onClick={() => router.push('/?view=clients')}
+                            onClick={() => router.push('/dashboard?view=clients')}
                         >
                             <Check className="size-3.5" /> TERMINER & QUITTER
                         </Button>
@@ -866,12 +999,35 @@ export function VisualBookingAdmin() {
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <SheetContent>
                     <SheetHeader>
-                        <div className="flex items-center gap-2">
-                            <SheetTitle>Réserver {selectedElement?.customData?.name}</SheetTitle>
-                            {selectedElement?.isReserved && (
-                                <span className="text-xs font-bold bg-amber-100 text-amber-600 px-2 py-0.5 rounded">DÉJÀ RÉSERVÉ</span>
-                            )}
-                        </div>
+                        {/* Show Element Image if available */}
+                        {(() => {
+                            const imgUrl = (selectedElement?.type === 'image' && selectedElement?.fileId && files[selectedElement.fileId]?.dataURL)
+                                ? files[selectedElement.fileId].dataURL
+                                : selectedElement?.customData?.imageUrl;
+
+                            return (
+                                <div className="h-32 -mx-6 -mt-6 mb-8 bg-gradient-to-br from-purple-600 to-blue-500 relative shrink-0">
+                                    {/* The Shadcn X button handles closing. Custom X removed here to avoid duplicates */}
+                                    <div className="absolute -bottom-6 left-6 size-16 p-1 bg-white rounded-2xl shadow-lg border border-gray-100 flex items-center justify-center overflow-hidden">
+                                        {imgUrl ? (
+                                            <img
+                                                src={imgUrl}
+                                                alt={selectedElement?.customData?.name || 'Aperçu'}
+                                                className="w-full h-full object-cover rounded-xl"
+                                            />
+                                        ) : (
+                                            <LayoutGrid className="size-8 text-blue-600" />
+                                        )}
+                                    </div>
+                                    <div className="absolute -bottom-6 left-28 text-left">
+                                        <div className="flex flex-col items-start justify-center">
+                                            <SheetTitle className="text-xl leading-tight">Mise en place : {selectedElement?.customData?.name}</SheetTitle>
+                                            <SheetDescription className="sr-only">Formulaire de réservation et de détails</SheetDescription>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
                         {selectedElement?.reservations?.length > 0 && (
                             <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-3">
                                 <div className="flex items-center gap-2 pb-2 border-b border-slate-200">

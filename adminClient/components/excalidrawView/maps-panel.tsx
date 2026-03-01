@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, MapPin, DollarSign, Clock, ChevronRight, Users, Calendar, LayoutGrid, Eye } from "lucide-react";
+import { Search, MapPin, DollarSign, Clock, ChevronRight, Users, Calendar, LayoutGrid, Eye, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ interface MapsPanelProps {
   elements: any[];
   onSelectElement: (id: string | null) => void; // Allow null to deselect
   selectedElementId: string | null;
+  files?: Record<string, any>; // Used to resolve excalidraw image rendering
 }
 
 const DAYS = [
@@ -32,9 +33,23 @@ const DAYS = [
   { id: 0, label: "Dimanche" },
 ];
 
-export function MapsPanel({ elements, onSelectElement, selectedElementId }: MapsPanelProps) {
+export function MapsPanel({ elements, onSelectElement, selectedElementId, files = {} }: MapsPanelProps) {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [activeDetail, setActiveDetail] = React.useState<string | null>(null);
+
+  /** Get the display image URL for an element (image type or custom imageUrl) */
+  const getElementImageUrl = (el: any): string | null => {
+    console.log("[DEBUG MapsPanel] el.id:", el.id, "type:", el.type, "fileId:", el.fileId, "filesAvailable:", Object.keys(files || {}).length);
+    // 1. Image element with a fileId → look up in files map
+    if (el.type === 'image' && el.fileId) {
+      const file = files[el.fileId];
+      console.log("[DEBUG MapsPanel] file found:", !!file, "hasDataURL:", !!file?.dataURL);
+      if (file?.dataURL) return file.dataURL;
+    }
+    // 2. Custom imageUrl stored in customData (manually set)
+    if (el.customData?.imageUrl) return el.customData.imageUrl;
+    return null;
+  };
 
   const filteredElements = React.useMemo(() => {
     if (!searchQuery) return elements;
@@ -157,20 +172,34 @@ export function MapsPanel({ elements, onSelectElement, selectedElementId }: Maps
         <SheetContent side="left" className="w-[400px] sm:w-[540px] p-0 overflow-hidden flex flex-col gap-0 border-r z-50">
           {selectedElement && (
             <>
-              {/* Header Image / Color Area */}
-              <div className="h-32 bg-gradient-to-br from-blue-500 to-purple-600 relative shrink-0">
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className="absolute top-4 right-4 rounded-full bg-white/20 hover:bg-white/40 text-white border-none shadow-none backdrop-blur-sm"
-                  onClick={() => setActiveDetail(null)}
-                >
-                  <ChevronRight className="rotate-180 size-4" />
-                </Button>
-                <div className="absolute -bottom-8 left-6 p-4 bg-white rounded-2xl shadow-lg border border-gray-100 flex items-center justify-center">
-                  <LayoutGrid className="size-8 text-blue-600" />
-                </div>
-              </div>
+              {/* Header Image / Color Area - Unified */}
+              {(() => {
+                const imgUrl = getElementImageUrl(selectedElement);
+                return (
+                  <div className="h-32 bg-gradient-to-br from-purple-600 to-blue-500 relative shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-4 right-4 rounded-full bg-black/10 hover:bg-black/20 text-white border-none shadow-none backdrop-blur-sm transition-colors"
+                      onClick={() => setActiveDetail(null)}
+                    >
+                      <X className="size-4" />
+                      <span className="sr-only">Fermer</span>
+                    </Button>
+                    <div className="absolute -bottom-8 left-6 size-16 p-1 bg-white rounded-2xl shadow-lg border border-gray-100 flex items-center justify-center overflow-hidden">
+                      {imgUrl ? (
+                        <img
+                          src={imgUrl}
+                          alt={selectedElement.customData?.name || 'Aperçu'}
+                          className="w-full h-full object-cover rounded-xl"
+                        />
+                      ) : (
+                        <LayoutGrid className="size-8 text-blue-600" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Content */}
               <ScrollArea className="flex-1 bg-gray-50/50">
@@ -178,7 +207,8 @@ export function MapsPanel({ elements, onSelectElement, selectedElementId }: Maps
 
                   {/* Title Section */}
                   <div>
-                    <h1 className="text-2xl font-bold text-gray-900">{selectedElement.customData?.name || "Sans Nom"}</h1>
+                    <SheetTitle className="text-2xl font-bold text-gray-900">{selectedElement.customData?.name || "Sans Nom"}</SheetTitle>
+                    <SheetDescription className="sr-only">Détails de l'élément sélectionné</SheetDescription>
                     <p className="text-sm text-gray-500 font-mono mt-1">ID: {selectedElement.id}</p>
                     <div className="flex flex-wrap gap-2 mt-4">
                       {selectedElement.customData?.price && (

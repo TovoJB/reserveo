@@ -43,57 +43,61 @@ import {
   DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const fullYearData = [
-  { month: "Jan", thisYear: 38000, prevYear: 32000 },
-  { month: "Feb", thisYear: 42000, prevYear: 38000 },
-  { month: "Mar", thisYear: 51500, prevYear: 37000 },
-  { month: "Apr", thisYear: 47000, prevYear: 31000 },
-  { month: "May", thisYear: 49000, prevYear: 35000 },
-  { month: "Jun", thisYear: 45000, prevYear: 33000 },
-  { month: "Jul", thisYear: 52000, prevYear: 36000 },
-  { month: "Aug", thisYear: 48000, prevYear: 34000 },
-  { month: "Sep", thisYear: 55000, prevYear: 39000 },
-  { month: "Oct", thisYear: 61000, prevYear: 42000 },
-  { month: "Nov", thisYear: 58000, prevYear: 40000 },
-  { month: "Dec", thisYear: 64000, prevYear: 45000 },
+const monthlyData = [
+  { label: "Jan", thisYear: 38000, prevYear: 32000 },
+  { label: "Fév", thisYear: 42000, prevYear: 38000 },
+  { label: "Mar", thisYear: 51500, prevYear: 37000 },
+  { label: "Avr", thisYear: 47000, prevYear: 31000 },
+  { label: "Mai", thisYear: 49000, prevYear: 35000 },
+  { label: "Juin", thisYear: 45000, prevYear: 33000 },
+  { label: "Juil", thisYear: 52000, prevYear: 36000 },
+  { label: "Août", thisYear: 48000, prevYear: 34000 },
+  { label: "Sep", thisYear: 55000, prevYear: 39000 },
+  { label: "Oct", thisYear: 61000, prevYear: 42000 },
+  { label: "Nov", thisYear: 58000, prevYear: 40000 },
+  { label: "Déc", thisYear: 64000, prevYear: 45000 },
+];
+
+const dailyData = Array.from({ length: 30 }, (_, i) => ({
+  label: `${i + 1}/02`,
+  thisYear: Math.floor(Math.random() * 2000) + 1000,
+  prevYear: Math.floor(Math.random() * 1800) + 900,
+}));
+
+const weeklyData = [
+  { label: "Sem 1", thisYear: 12000, prevYear: 10000 },
+  { label: "Sem 2", thisYear: 14500, prevYear: 13000 },
+  { label: "Sem 3", thisYear: 11000, prevYear: 12500 },
+  { label: "Sem 4", thisYear: 16000, prevYear: 14000 },
 ];
 
 type ChartType = "bar" | "line" | "area";
-type TimePeriod = "3months" | "6months" | "year" | "q1" | "q2" | "q3" | "q4";
+type TimePeriod = "day" | "week" | "6months" | "year";
 
 const periodLabels: Record<TimePeriod, string> = {
-  "3months": "Last 3 Months",
-  "6months": "Last 6 Months",
-  year: "Full Year",
-  q1: "Q1 (Jan-Mar)",
-  q2: "Q2 (Apr-Jun)",
-  q3: "Q3 (Jul-Sep)",
-  q4: "Q4 (Oct-Dec)",
+  day: "Vue Journalière (30j)",
+  week: "Vue Hebdomadaire",
+  "6months": "6 derniers mois",
+  year: "Année complète",
 };
 
 const insights = [
-  "March is the highest revenue for the last 6 months with $51,500",
-  "April shows strong growth compared to previous year",
-  "Consistent revenue increase throughout the period",
-  "Q1 total: $131,500 - up 15% year over year",
+  "Mars est le mois record sur les 6 derniers mois avec $51,500",
+  "Avril montre une forte croissance par rapport à l'année dernière",
+  "Augmentation constante des réservations sur la période",
+  "Total Q1 : $131,500 - en hausse de 15% par rapport à l'an dernier",
 ];
 
 function getDataForPeriod(period: TimePeriod) {
   switch (period) {
-    case "3months":
-      return fullYearData.slice(-3);
+    case "day":
+      return dailyData;
+    case "week":
+      return weeklyData;
     case "6months":
-      return fullYearData.slice(0, 6);
-    case "q1":
-      return fullYearData.slice(0, 3);
-    case "q2":
-      return fullYearData.slice(3, 6);
-    case "q3":
-      return fullYearData.slice(6, 9);
-    case "q4":
-      return fullYearData.slice(9, 12);
+      return monthlyData.slice(0, 6);
     default:
-      return fullYearData;
+      return monthlyData;
   }
 }
 
@@ -120,7 +124,7 @@ function CustomTooltip({
             className="size-2 sm:size-2.5 rounded-full"
             style={{ background: "#6e3ff3" }}
           />
-          <span className="text-[10px] sm:text-sm text-muted-foreground">This Year:</span>
+          <span className="text-[10px] sm:text-sm text-muted-foreground">Sur app mobile :</span>
           <span className="text-[10px] sm:text-sm font-medium text-foreground">
             ${Number(thisYear).toLocaleString()}
           </span>
@@ -130,19 +134,18 @@ function CustomTooltip({
             className="size-2 sm:size-2.5 rounded-full"
             style={{ background: "#e255f2" }}
           />
-          <span className="text-[10px] sm:text-sm text-muted-foreground">Prev Year:</span>
+          <span className="text-[10px] sm:text-sm text-muted-foreground">Sur votre site web :</span>
           <span className="text-[10px] sm:text-sm font-medium text-foreground">
             ${Number(prevYear).toLocaleString()}
           </span>
         </div>
         <div className="pt-1 border-t border-border mt-1">
           <span
-            className={`text-[10px] sm:text-xs font-medium ${
-              diff >= 0 ? "text-emerald-500" : "text-red-500"
-            }`}
+            className={`text-[10px] sm:text-xs font-medium ${diff >= 0 ? "text-emerald-500" : "text-red-500"
+              }`}
           >
             {diff >= 0 ? "+" : ""}
-            {percentage}% vs last year
+            {percentage}% de plus sur mobile
           </span>
         </div>
       </div>
@@ -153,7 +156,7 @@ function CustomTooltip({
 export function RevenueFlowChart() {
   const { resolvedTheme } = useTheme();
   const [chartType, setChartType] = useState<ChartType>("bar");
-  const [period, setPeriod] = useState<TimePeriod>("6months");
+  const [period, setPeriod] = useState<TimePeriod>("day");
   const [showGrid, setShowGrid] = useState(true);
   const [showThisYear, setShowThisYear] = useState(true);
   const [showPrevYear, setShowPrevYear] = useState(true);
@@ -174,16 +177,16 @@ export function RevenueFlowChart() {
           <Button variant="outline" size="icon" className="size-7 sm:size-8">
             <BarChart2 className="size-4 sm:size-[18px] text-muted-foreground" />
           </Button>
-          <span className="text-sm sm:text-base font-medium">Revenue Flow</span>
+          <span className="text-sm sm:text-base font-medium">Flux de Réservations</span>
         </div>
         <div className="hidden sm:flex items-center gap-3 sm:gap-5">
           <div className="flex items-center gap-1.5">
             <div className="size-2.5 sm:size-3 rounded-full bg-[#6e3ff3]" />
-            <span className="text-[10px] sm:text-xs text-muted-foreground">This Year</span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground">Sur app mobile</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="size-2.5 sm:size-3 rounded-full bg-[#e255f2]" />
-            <span className="text-[10px] sm:text-xs text-muted-foreground">Prev Year</span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground">Sur votre site web</span>
           </div>
         </div>
         <DropdownMenu>
@@ -266,7 +269,7 @@ export function RevenueFlowChart() {
                 className="size-3 rounded-full mr-2"
                 style={{ background: "#6e3ff3" }}
               />
-              Show This Year
+              Sur app mobile
             </DropdownMenuCheckboxItem>
 
             <DropdownMenuCheckboxItem
@@ -277,7 +280,7 @@ export function RevenueFlowChart() {
                 className="size-3 rounded-full mr-2"
                 style={{ background: "#e255f2" }}
               />
-              Show Prev Year
+              Sur votre site web
             </DropdownMenuCheckboxItem>
 
             <DropdownMenuSeparator />
@@ -285,7 +288,7 @@ export function RevenueFlowChart() {
             <DropdownMenuItem
               onClick={() => {
                 setChartType("bar");
-                setPeriod("6months");
+                setPeriod("day");
                 setShowGrid(true);
                 setShowThisYear(true);
                 setShowPrevYear(true);
@@ -306,12 +309,12 @@ export function RevenueFlowChart() {
               ${totalRevenue.toLocaleString()}
             </p>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              Total Revenue ({periodLabels[period]})
+              Revenu Total ({periodLabels[period]})
             </p>
           </div>
 
           <div className="bg-muted/50 rounded-lg p-3 sm:p-4 space-y-3 sm:space-y-4">
-            <p className="text-xs sm:text-sm font-semibold">🏆 Best Performing Month</p>
+            <p className="text-xs sm:text-sm font-semibold">🏆 Mois le plus performant</p>
             <p className="text-[10px] sm:text-xs text-muted-foreground leading-relaxed">
               {insights[currentInsight]}
             </p>
@@ -328,11 +331,10 @@ export function RevenueFlowChart() {
                 {insights.map((_, index) => (
                   <div
                     key={index}
-                    className={`flex-1 h-0.5 rounded-full transition-colors ${
-                      index === currentInsight
-                        ? "bg-foreground"
-                        : "bg-muted-foreground/30"
-                    }`}
+                    className={`flex-1 h-0.5 rounded-full transition-colors ${index === currentInsight
+                      ? "bg-foreground"
+                      : "bg-muted-foreground/30"
+                      }`}
                   />
                 ))}
               </div>
@@ -382,7 +384,7 @@ export function RevenueFlowChart() {
                   />
                 )}
                 <XAxis
-                  dataKey="month"
+                  dataKey="label"
                   axisLine={false}
                   tickLine={false}
                   tick={{ fill: axisColor, fontSize: 10 }}
@@ -427,7 +429,7 @@ export function RevenueFlowChart() {
                   />
                 )}
                 <XAxis
-                  dataKey="month"
+                  dataKey="label"
                   axisLine={false}
                   tickLine={false}
                   tick={{ fill: axisColor, fontSize: 10 }}
@@ -498,7 +500,7 @@ export function RevenueFlowChart() {
                   />
                 )}
                 <XAxis
-                  dataKey="month"
+                  dataKey="label"
                   axisLine={false}
                   tickLine={false}
                   tick={{ fill: axisColor, fontSize: 10 }}

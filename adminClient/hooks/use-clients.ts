@@ -3,27 +3,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "./use-api";
 
-export interface BackendClient {
-    id: number;
-    name?: string;
-    email: string;
-    phone?: string;
-    status: "ACTIVE" | "SUSPENDED" | "BANNED";
-    restrictions?: string | null;
-    bookingCount?: number;
-    lastInteraction?: string;
-    profile?: {
-        firstName?: string;
-        lastName?: string;
-        avatar?: string;
-    };
-    reservations?: Array<{
-        id: number;
-        startDate: string;
-        status: string;
-        space?: { name: string };
-    }>;
-}
+export type { Client as BackendClient } from "@/types";
+import { type Client as BackendClient } from "@/types";
 
 const QUERY_KEY = "clients";
 
@@ -93,6 +74,68 @@ export function useDeleteClient() {
     return useMutation({
         mutationFn: async (id: number) => {
             await api.delete(`/clients/${id}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+        },
+    });
+}
+
+export function useUpdateClient() {
+    const api = useApi();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, data }: { id: number; data: any }) => {
+            const response = await api.put<{ data: BackendClient }>(`/clients/${id}`, data);
+            return response.data.data;
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+            queryClient.invalidateQueries({ queryKey: [QUERY_KEY, variables.id] });
+        },
+    });
+}
+
+export function useInviteClient() {
+    const api = useApi();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (data: { email: string; firstName?: string; lastName?: string }) => {
+            const res = await api.post<{ data: any }>("/clients", data);
+            return res.data.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+        },
+    });
+}
+
+export function useSendInvitation() {
+    const api = useApi();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (relationshipId: number) => {
+            const res = await api.post<{ data: any }>("/clients/send-invitation", {
+                relationshipId,
+            });
+            return res.data.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+        },
+    });
+}
+
+export function useRemoveClientRelationship() {
+    const api = useApi();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (relationshipId: number) => {
+            await api.delete(`/clients/relationship/${relationshipId}`);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });

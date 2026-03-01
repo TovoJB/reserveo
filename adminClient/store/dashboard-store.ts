@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { LeadType, LeadStatus, LeadSource } from "@/mock-data/dashboard";
 
 interface DashboardStore {
+  workspaceType: "fixed" | "event" | null;
+  usageType: "PROFESSIONAL" | "PERSONAL" | null;
   searchQuery: string;
   typeFilter: LeadType | "all";
   statusFilter: LeadStatus | "all";
@@ -9,6 +11,8 @@ interface DashboardStore {
   sortBy: "name" | "email" | "followUp" | "status" | "score";
   sortOrder: "asc" | "desc";
   chartPeriod: "last_week" | "last_month" | "last_quarter";
+  setWorkspaceType: (type: "fixed" | "event" | null) => void;
+  setUsageType: (type: "PROFESSIONAL" | "PERSONAL" | null) => void;
   setSearchQuery: (query: string) => void;
   setTypeFilter: (filter: LeadType | "all") => void;
   setStatusFilter: (filter: LeadStatus | "all") => void;
@@ -20,6 +24,8 @@ interface DashboardStore {
 }
 
 export const useDashboardStore = create<DashboardStore>((set) => ({
+  workspaceType: null,
+  usageType: null,
   searchQuery: "",
   typeFilter: "all",
   statusFilter: "all",
@@ -27,6 +33,8 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   sortBy: "name",
   sortOrder: "asc",
   chartPeriod: "last_month",
+  setWorkspaceType: (type) => set({ workspaceType: type }),
+  setUsageType: (type) => set({ usageType: type }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setTypeFilter: (filter) => set({ typeFilter: filter }),
   setStatusFilter: (filter) => set({ statusFilter: filter }),

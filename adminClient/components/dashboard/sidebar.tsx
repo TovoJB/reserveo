@@ -75,9 +75,22 @@ import {
   MousePointerClick,
   MoreHorizontal,
   Trash2,
+  RefreshCw,
+  CloudUpload,
+  Car,
+  Trees,
+  Layout,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+import { AlertTriangle } from "lucide-react";
 
 const navItems = [
   { title: "Dashboard", icon: BarChart3 },
@@ -85,6 +98,8 @@ const navItems = [
   { title: "Réservation Admin", icon: MousePointerClick },
   { title: "Liste des Réservations", icon: CheckSquare },
   { title: "Plan de Salle", icon: Globe },
+  { title: "Organisation", icon: Building },
+  { title: "Mes Événements", icon: Calendar },
   { title: "Modèles d'Espaces", icon: Layers },
   { title: "Types & Paramètres", icon: Building },
   { title: "Calendrier", icon: Calendar },
@@ -95,6 +110,9 @@ const navItems = [
 
 
 import { useWorkgroupStore, WorkgroupItem } from "@/store/workgroup-store";
+import { useDashboardStore } from "@/store/dashboard-store";
+import { useAccountSync } from "@/hooks/use-account-sync";
+import { useApi } from "@/hooks/use-api";
 
 const iconMap: Record<string, React.ElementType> = {
   Globe,
@@ -104,6 +122,11 @@ const iconMap: Record<string, React.ElementType> = {
   Code,
   Headphones,
   UserPlus,
+  Layers,
+  Car,
+  Trees,
+  Layout,
+  Building,
 };
 
 export function DashboardSidebar({
@@ -113,13 +136,78 @@ export function DashboardSidebar({
   const { signOut } = useClerk();
   const currentViewId = searchParams?.get("id");
 
-  const { groups, expandedItems, addItem, deleteItem, toggleItem, setExpandedItems } = useWorkgroupStore();
+  const { groups, expandedItems, addItem, deleteItem, toggleItem, setExpandedItems, setGroups } = useWorkgroupStore();
+  const { workspaceType } = useDashboardStore();
+  const { me } = useAccountSync();
+
+  // Professional Delete Modal States
+  const [itemToDelete, setItemToDelete] = React.useState<WorkgroupItem | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+
+  const hasDraftProfile = React.useMemo(() => {
+    if (!me?.onboardingData) return false;
+    try {
+      const parsed = typeof me.onboardingData === "string" ? JSON.parse(me.onboardingData) : me.onboardingData;
+      return parsed?.isComplete === false;
+    } catch {
+      return false;
+    }
+  }, [me]);
+
+  const filteredNavItems = navItems.map(item => {
+    if (item.title === "Organisation") {
+      return {
+        ...item,
+        title: groups.length > 0 ? "Organisation" : "Initialisation d'organisation",
+      };
+    }
+    return item;
+  }).filter(item => {
+    if (item.title === "Mes Événements") {
+      return workspaceType === "event";
+    }
+    return true;
+  });
 
   // Dialog State
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [newItemName, setNewItemName] = React.useState("");
   const [newItemType, setNewItemType] = React.useState<'folder' | 'file'>('folder');
   const [selectedParentId, setSelectedParentId] = React.useState<string>("root");
+
+  const [isSyncing, setIsSyncing] = React.useState(false);
+  const api = useApi();
+
+  const handleFetchWorkgroups = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await api.get("/workgroups");
+      if (response.data && response.data.data) {
+        setGroups(response.data.data);
+      }
+    } catch (error) {
+      console.error("Fetch failed:", error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handlePushWorkgroups = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await api.put("/workgroups/bulk", { items: groups });
+      if (response.data && response.data.data) {
+        setGroups(response.data.data);
+      }
+      alert("Arborescence sauvegardée sur le serveur !");
+    } catch (error) {
+      console.error("Sync failed:", error);
+      alert("Échec de la sauvegarde.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Helper to find all potential parent folders (folders that can contain other items)
   const getAllFolders = (items: WorkgroupItem[], depth = 0): { id: string, name: string, level: number }[] => {
@@ -136,32 +224,71 @@ export function DashboardSidebar({
     return folders;
   };
 
-  const handleAddItem = () => {
+  const handleAddItem = async () => {
     if (!newItemName.trim()) return;
 
-    const newItem: WorkgroupItem = {
-      id: `${newItemName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
-      name: newItemName,
-      icon: newItemType === 'folder' ? 'Folder' : 'File',
-      type: newItemType,
-      children: newItemType === 'folder' ? [] : undefined,
-      floorId: newItemType === 'file' ? `floor-${Date.now()}` : undefined
-    };
+    setIsSyncing(true);
+    try {
+      // Map name to icon automatically based on name or type
+      let defaultIcon = newItemType === 'folder' ? 'Folder' : 'File';
 
-    addItem(newItem, selectedParentId);
+      const parentId = selectedParentId === "root" ? null : parseInt(selectedParentId);
 
-    // Reset and close
-    setNewItemName("");
-    setIsDialogOpen(false);
-    // Auto expand the parent if not root
-    if (selectedParentId !== "root" && !expandedItems.includes(selectedParentId)) {
-      toggleItem(selectedParentId);
+      const response = await api.post("/workgroups", {
+        name: newItemName,
+        type: newItemType,
+        parentId: isNaN(parentId as any) ? null : parentId,
+        icon: defaultIcon
+      });
+
+      if (response.data && response.data.data) {
+        // Refresh full tree to get real IDs and associations
+        await handleFetchWorkgroups();
+      }
+
+      // Reset and close
+      setNewItemName("");
+      setIsDialogOpen(false);
+
+      // Auto expand the parent if not root
+      if (selectedParentId !== "root" && !expandedItems.includes(selectedParentId)) {
+        toggleItem(selectedParentId);
+      }
+    } catch (error) {
+      console.error("Create item failed:", error);
+      alert("Erreur lors de la création de l'élément.");
+    } finally {
+      setIsSyncing(false);
     }
   };
 
-  const handleDeleteItem = (itemId: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cet élément ?")) return;
-    deleteItem(itemId);
+  const handleDeleteItem = (item: WorkgroupItem) => {
+    setItemToDelete(item);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!itemToDelete) return;
+
+    setIsDeleting(true);
+    const itemId = itemToDelete.id;
+
+    try {
+      // Note: For elements not synched with server yet, this might fail with 404
+      await api.delete(`/workgroups/${itemId}`);
+
+      // Optimistic delete only after server success or handled error
+      deleteItem(itemId);
+      setIsDeleteDialogOpen(false);
+    } catch (e) {
+      console.error("Failed to delete workgroup item on server:", e);
+      // Even if server fails, if it's 404 we can delete locally
+      deleteItem(itemId);
+      setIsDeleteDialogOpen(false);
+    } finally {
+      setIsDeleting(false);
+      setItemToDelete(null);
+    }
   };
 
   const renderWorkgroupItem = (
@@ -175,37 +302,40 @@ export function DashboardSidebar({
 
     const isExpanded = expandedItems.includes(item.id);
     const isActive = currentViewId === item.id;
-    const RawIcon = item.icon ? iconMap[item.icon as string] : File;
-    const Icon = typeof RawIcon === 'function' || typeof RawIcon === 'object' ? RawIcon : File;
+
+    // Support both PascalCase and lowercase icon names
+    const iconName = item.icon || (item.type === 'file' ? 'File' : 'Folder');
+    const RawIcon = iconMap[iconName] || iconMap[iconName.charAt(0).toUpperCase() + iconName.slice(1)] || File;
+    const Icon = RawIcon;
     const paddingLeft = level * 12;
 
     const ItemActions = () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 ml-auto opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 data-[state=open]:opacity-100"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreHorizontal className="size-3" />
-            <span className="sr-only">Actions</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            className="text-destructive focus:text-destructive cursor-pointer"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDeleteItem(item.id);
-            }}
-          >
-            <Trash2 className="size-4 mr-2" />
-            Supprimer
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-6 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={(e) => {
+          e.stopPropagation();
+          handleDeleteItem(item);
+        }}
+      >
+        <Trash2 className="size-3" />
+        <span className="sr-only">Supprimer</span>
+      </Button>
     );
+
+    const WarningIndicator = () => item.hasWarning ? (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <AlertTriangle className="size-3 text-orange-500 animate-pulse shrink-0" />
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="text-xs">{item.warningMessage || "Cet élément nécessite votre attention"}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ) : null;
 
     if (isFolder) {
       return (
@@ -214,15 +344,16 @@ export function DashboardSidebar({
           open={isExpanded}
           onOpenChange={() => toggleItem(item.id)}
         >
-          <SidebarMenuItem>
+          <SidebarMenuItem className="relative group/menu-item">
             <CollapsibleTrigger asChild>
               <SidebarMenuButton
                 className="h-7 text-sm group pr-8"
                 style={{ paddingLeft: `${8 + paddingLeft}px` }}
               >
-                <Icon className="size-3.5" />
+                <Icon className="size-3.5 shrink-0" />
                 <span className="flex-1 truncate">{item.name}</span>
-                <div className="flex items-center gap-1 ml-auto">
+                <div className="flex items-center gap-1.5 ml-2">
+                  <WarningIndicator />
                   {isExpanded ? (
                     <ChevronDown className="size-3 text-muted-foreground" />
                   ) : (
@@ -231,8 +362,16 @@ export function DashboardSidebar({
                 </div>
               </SidebarMenuButton>
             </CollapsibleTrigger>
-            <SidebarMenuAction asChild showOnHover>
-              <ItemActions />
+            <SidebarMenuAction
+              showOnHover
+              className="peer-data-[active=true]:bg-sidebar-accent"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteItem(item);
+              }}
+            >
+              <Trash2 className="size-3.5" />
+              <span className="sr-only">Supprimer</span>
             </SidebarMenuAction>
             <CollapsibleContent>
               <SidebarMenuSub className="mr-0 pr-0">
@@ -258,20 +397,30 @@ export function DashboardSidebar({
 
     // File Item
     return (
-      <SidebarMenuItem key={item.id}>
+      <SidebarMenuItem key={item.id} className="relative group/menu-item">
         <SidebarMenuButton
           asChild
           isActive={isActive}
           className="h-7 text-sm group pr-8"
           style={{ paddingLeft: `${8 + paddingLeft}px` }}
         >
-          <Link href={`/?view=plan&id=${item.id}`} className="flex items-center flex-1 min-w-0 gap-2 overflow-hidden">
+          <Link href={`/dashboard?view=plan&id=${item.id}`} className="flex items-center flex-1 min-w-0 gap-2">
             <Icon className="size-3.5 shrink-0" />
-            <span className="truncate">{item.name}</span>
+            <span className="flex-1 truncate">{item.name}</span>
+            <div className="flex items-center gap-1.5 ml-2">
+              <WarningIndicator />
+            </div>
           </Link>
         </SidebarMenuButton>
-        <SidebarMenuAction asChild showOnHover>
-          <ItemActions />
+        <SidebarMenuAction
+          showOnHover
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDeleteItem(item);
+          }}
+        >
+          <Trash2 className="size-3.5" />
+          <span className="sr-only">Supprimer</span>
         </SidebarMenuAction>
       </SidebarMenuItem>
     );
@@ -282,10 +431,13 @@ export function DashboardSidebar({
       <SidebarHeader className="px-2.5 py-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2.5 w-full hover:bg-sidebar-accent rounded-md p-1 -m-1 transition-colors shrink-0">
+            <button className="flex items-center gap-2.5 w-full hover:bg-sidebar-accent rounded-md p-1 -m-1 transition-colors shrink-0 relative group/profile">
               <div className="flex size-7 items-center justify-center rounded-lg bg-foreground text-background shrink-0">
                 <span className="text-sm font-bold">S</span>
               </div>
+              {hasDraftProfile && (
+                <div className="absolute -top-1 -right-1 size-3 bg-orange-500 rounded-full border-2 border-sidebar animate-premium-pulse z-20" />
+              )}
               <div className="flex items-center gap-1 group-data-[collapsible=icon]:hidden">
                 <span className="text-sm font-medium">MadaEvent</span>
                 <ChevronsUpDown className="size-3 text-muted-foreground" />
@@ -294,11 +446,32 @@ export function DashboardSidebar({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
             <DropdownMenuItem asChild>
-              <Link href="/?view=profile" className="flex items-center gap-2 cursor-pointer">
-                <Building className="size-4" />
-                <span>Mon Profil</span>
+              <Link href="/dashboard?view=profile" className="flex items-center gap-2 cursor-pointer justify-between w-full">
+                <div className="flex items-center gap-2">
+                  <Building className="size-4" />
+                  <span>Mon Profil</span>
+                </div>
+                {hasDraftProfile && (
+                  <Badge variant="secondary" className="text-[9px] bg-orange-500/10 text-orange-600 border-orange-500/20 animate-pulse">
+                    À remplir
+                  </Badge>
+                )}
               </Link>
             </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={groups.length > 0 ? "/dashboard?view=organization" : "/dashboard?view=organization-setup"} className="flex items-center gap-2 cursor-pointer">
+                <Globe className="size-4" />
+                <span>{groups.length > 0 ? "Organisation" : "Initialisation d'organisation"}</span>
+              </Link>
+            </DropdownMenuItem>
+            {workspaceType === "event" && (
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard?view=events" className="flex items-center gap-2 cursor-pointer">
+                  <Calendar className="size-4" />
+                  <span>Mes Événements</span>
+                </Link>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem>
               <Settings className="size-4" />
               <span>Settings</span>
@@ -323,7 +496,7 @@ export function DashboardSidebar({
         <SidebarGroup className="p-0">
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {filteredNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
@@ -338,22 +511,28 @@ export function DashboardSidebar({
                       (item.title === "Réservation Admin" && searchParams?.get("view") === "admin-reservation") ||
                       (item.title === "Développement" && searchParams?.get("view") === "development") ||
                       (item.title === "Support" && searchParams?.get("view") === "support") ||
-                      (item.title === "Equipes" && searchParams?.get("view") === "teams")
+                      (item.title === "Equipes" && searchParams?.get("view") === "teams") ||
+                      (item.title === "Organisation" && searchParams?.get("view") === "organization") ||
+                      (item.title === "Initialisation d'organisation" && searchParams?.get("view") === "organization-setup") ||
+                      (item.title === "Mes Événements" && searchParams?.get("view") === "events")
                     }
                     className="h-7"
                   >
                     <Link href={
-                      item.title === "Dashboard" ? "/" :
-                        item.title === "Calendrier" ? "/?view=calendar" :
-                          item.title === "Modèles d'Espaces" ? "/?view=bookmarks" :
-                            item.title === "Types & Paramètres" ? "/?view=types" :
-                              item.title === "Gestion Clients" ? "/?view=clients" :
-                                item.title === "Liste des Réservations" ? "/?view=tasks" :
-                                  item.title === "Plan de Salle" ? "/?view=bookings" :
-                                    item.title === "Réservation Admin" ? "/?view=admin-reservation" :
-                                      item.title === "Développement" ? "/?view=development" :
-                                        item.title === "Support" ? "/?view=support" :
-                                          item.title === "Equipes" ? "/?view=teams" : "#"
+                      item.title === "Dashboard" ? "/dashboard" :
+                        item.title === "Calendrier" ? "/dashboard?view=calendar" :
+                          item.title === "Modèles d'Espaces" ? "/dashboard?view=bookmarks" :
+                            item.title === "Types & Paramètres" ? "/dashboard?view=types" :
+                              item.title === "Gestion Clients" ? "/dashboard?view=clients" :
+                                item.title === "Liste des Réservations" ? "/dashboard?view=tasks" :
+                                  item.title === "Plan de Salle" ? "/dashboard?view=bookings" :
+                                    item.title === "Réservation Admin" ? "/dashboard?view=admin-reservation" :
+                                      item.title === "Développement" ? "/dashboard?view=development" :
+                                        item.title === "Support" ? "/dashboard?view=support" :
+                                          item.title === "Equipes" ? "/dashboard?view=teams" :
+                                            item.title === "Organisation" ? "/dashboard?view=organization" :
+                                              item.title === "Initialisation d'organisation" ? "/dashboard?view=organization-setup" :
+                                                item.title === "Mes Événements" ? "/dashboard?view=events" : "#"
                     }>
                       <item.icon className="size-3.5" />
                       <span className="text-sm">{item.title}</span>
@@ -371,6 +550,26 @@ export function DashboardSidebar({
               Workgroups
             </span>
             <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("size-5", isSyncing && "animate-spin")}
+                onClick={handleFetchWorkgroups}
+                title="Actualiser depuis le serveur"
+                disabled={isSyncing}
+              >
+                <RefreshCw className="size-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-5"
+                onClick={handlePushWorkgroups}
+                title="Sauvegarder sur le serveur"
+                disabled={isSyncing}
+              >
+                <CloudUpload className="size-3" />
+              </Button>
               <Button variant="ghost" size="icon" className="size-5">
                 <Search className="size-3" />
               </Button>
@@ -450,6 +649,41 @@ export function DashboardSidebar({
       <SidebarFooter className="px-2.5 pb-3 group-data-[collapsible=icon]:hidden">
         {/* Placeholder removed */}
       </SidebarFooter>
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="size-5" />
+              Confirmation de suppression
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              Êtes-vous sûr de vouloir supprimer <strong>{itemToDelete?.name}</strong> ?
+              <br /><br />
+              <span className="text-destructive font-medium">
+                Attention : Cette action est irréversible et supprimera également tous les sous-éléments (étages, zones, tables) rattachés à cet espace.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex sm:justify-end gap-2 pt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={isDeleting}
+            >
+              Annuler
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Suppression..." : "Supprimer tout"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sidebar>
   );
 }

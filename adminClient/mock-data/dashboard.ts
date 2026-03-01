@@ -1,19 +1,12 @@
-export type ClientStatus = "active" | "banned" | "subscribed";
+import {
+  ClientStatus,
+  ClientRestriction,
+  RestrictionRule,
+  RestrictionOperator,
+  ClientRestrictionDetails
+} from "@/types";
 
-export type RestrictionOperator = "min" | "max" | "equal";
-
-export interface RestrictionRule {
-  type: string; // e.g. "chaise", "table"
-  operator: RestrictionOperator;
-  value: number;
-}
-
-export interface ClientRestrictionDetails {
-  rules: RestrictionRule[];
-  forbiddenPlaces: string[];
-}
-
-export type ClientRestriction = "none" | "all" | ClientRestrictionDetails;
+export type { ClientStatus, ClientRestriction, RestrictionRule, RestrictionOperator, ClientRestrictionDetails };
 
 export interface ReservationHistory {
   id: string;
@@ -33,70 +26,16 @@ export interface Client {
     whatsapp?: string;
   };
   status: ClientStatus;
+  relationshipStatus?: ClientStatus;
   restrictions: ClientRestriction;
   lastInteraction: string;
   history: ReservationHistory[];
   bookingCount: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export const clients: Client[] = [
-  {
-    id: "1",
-    name: "Sarah Rakoto",
-    avatar: "https://api.dicebear.com/9.x/glass/svg?seed=sarah",
-    email: "sarah.r@example.mg",
-    phone: "034 11 222 33",
-    socials: {
-      facebook: "fb.com/sarah.rakoto",
-      whatsapp: "+261341122233"
-    },
-    status: "subscribed",
-    restrictions: "none",
-    lastInteraction: "2024-02-14 10:30",
-    bookingCount: 12,
-    history: [
-      { id: "res-1", date: "2024-01-15", space: "Espace Cristal", status: "completed" },
-      { id: "res-2", date: "2024-02-10", space: "Jardin Eden", status: "completed" }
-    ]
-  },
-  {
-    id: "2",
-    name: "James Andria",
-    avatar: "https://api.dicebear.com/9.x/glass/svg?seed=james",
-    email: "james.a@gmail.com",
-    phone: "032 44 555 66",
-    socials: {
-      whatsapp: "+261324455566"
-    },
-    status: "active",
-    restrictions: {
-      rules: [{ type: "table", operator: "max", value: 2 }],
-      forbiddenPlaces: []
-    },
-    lastInteraction: "2024-02-13 14:20",
-    bookingCount: 5,
-    history: [
-      { id: "res-3", date: "2023-12-20", space: "Espace Cristal", status: "completed" }
-    ]
-  },
-  {
-    id: "3",
-    name: "Daniela Lala",
-    avatar: "https://api.dicebear.com/9.x/glass/svg?seed=daniela",
-    email: "daniela.l@outlook.com",
-    phone: "033 77 888 99",
-    socials: {
-      facebook: "fb.com/daniela.lala"
-    },
-    status: "banned",
-    restrictions: "all",
-    lastInteraction: "2023-11-05 09:00",
-    bookingCount: 1,
-    history: [
-      { id: "res-4", date: "2023-11-01", space: "Petit Salon", status: "cancelled" }
-    ]
-  }
-];
+export const clients: Client[] = [];
 
 // Re-exporting original dashboard types and data for compatibility with other components
 export type LeadType = "cold" | "warm";

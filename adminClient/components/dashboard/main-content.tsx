@@ -7,6 +7,7 @@ import { CalendarView } from "../calendar/calendar-view";
 import { CalendarControls } from "../calendar/calendar-controls";
 import { BookmarksContent } from "../bookmarks/content";
 import { BookmarksHeader } from "../bookmarks/header";
+import { SpaceModelsView } from "../bookmarks/space-models-view";
 import { ClientsTable } from "./clients-table";
 import { TasksTable } from "./tasks-table";
 import { BookingView } from "../excalidrawView/booking-view";
@@ -17,15 +18,25 @@ import { SupportView } from "./support-view";
 import { ProfileView } from "./profile-view";
 import { TeamsView } from "./teams-view";
 import { ClientsImportView } from "./clients-import-view";
+import { EventsView } from "./events-view";
+import { OrganizationSetupView } from "./organization-setup-view";
+import { OrganizationView } from "./organization-view";
+import { useDashboardStore } from "@/store/dashboard-store";
+import { UsageTypeSelection } from "./usage-type-selection";
+import { useAccountSync } from "@/hooks/use-account-sync";
 
 export function MainContent() {
     const searchParams = useSearchParams();
     const view = searchParams?.get("view");
     const id = searchParams?.get("id");
 
-    // Important: No fallback to StatsContent outside of the switch logic
-    if (!view) {
-        return <StatsContent />;
+    const { workspaceType, usageType } = useDashboardStore();
+    const { isLoading, me } = useAccountSync();
+
+    // If we've chosen "Event Organizer" but haven't specified the usage scale yet, 
+    // we force the selection step unless we're still loading.
+    if (workspaceType === "event" && !usageType && !isLoading && me) {
+        return <UsageTypeSelection />;
     }
 
     if (view === "plan" && id) {
@@ -42,12 +53,7 @@ export function MainContent() {
                     </div>
                 );
             case "bookmarks":
-                return (
-                    <div className="flex flex-col h-full w-full overflow-hidden">
-                        <BookmarksHeader />
-                        <BookmarksContent />
-                    </div>
-                );
+                return <SpaceModelsView />;
             case "clients":
                 return <ClientsTable />;
             case "tasks":
@@ -68,6 +74,12 @@ export function MainContent() {
                 return <TeamsView />;
             case "clients-import":
                 return <ClientsImportView />;
+            case "events":
+                return <EventsView />;
+            case "organization-setup":
+                return <OrganizationSetupView />;
+            case "organization":
+                return <OrganizationView />;
             default:
                 return <StatsContent />;
         }
